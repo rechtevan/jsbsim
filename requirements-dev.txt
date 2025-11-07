@@ -1,6 +1,9 @@
 # Development dependencies for JSBSim
 # Install with: pip install -r requirements-dev.txt
 #
+# SPDX-FileCopyrightText: 2025 Booz Allen Hamilton Inc.
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
 # This will also install production dependencies from python/requirements.txt
 
 # First install production dependencies

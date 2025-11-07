@@ -1,5 +1,8 @@
 # Python project configuration for JSBSim
 # https://peps.python.org/pep-0518/
+#
+# SPDX-FileCopyrightText: 2025 Booz Allen Hamilton Inc.
+# SPDX-License-Identifier: LGPL-2.1-or-later
 
 [build-system]
 requires = ["setuptools>=60.0.0", "wheel", "cython"]

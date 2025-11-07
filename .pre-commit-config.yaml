@@ -1,6 +1,9 @@
 # Pre-commit hooks for JSBSim
 # See https://pre-commit.com for more information
 #
+# SPDX-FileCopyrightText: 2025 Booz Allen Hamilton Inc.
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
 # Usage:
 #   pre-commit install                 # Install git hooks
 #   pre-commit run --all-files         # Run on all files
