@@ -1,0 +1,45 @@
+# Flake8 configuration for JSBSim
+# https://flake8.pycqa.org/en/latest/user/configuration.html
+
+[flake8]
+# Max line length (match black)
+max-line-length = 100
+
+# Ignore specific errors
+extend-ignore =
+    # E203: whitespace before ':' (conflicts with black)
+    E203,
+    # W503: line break before binary operator (conflicts with black)
+    W503,
+    # E501: line too long (handled by black)
+    E501
+
+# Exclude directories
+exclude =
+    .git,
+    __pycache__,
+    .pytest_cache,
+    .mypy_cache,
+    build,
+    build-*,
+    .local,
+    .venv,
+    .tox,
+    dist,
+    *.egg-info
+
+# Show source code for each error
+show-source = True
+
+# Show error codes in output
+show-pep8 = True
+
+# Complexity
+max-complexity = 15
+
+# Per-file ignores
+per-file-ignores =
+    # __init__.py files can have unused imports
+    __init__.py:F401,F403
+    # Test files can be longer and have more complexity
+    tests/*:E501,C901

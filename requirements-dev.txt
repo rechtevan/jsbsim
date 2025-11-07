@@ -1,0 +1,45 @@
+# Development dependencies for JSBSim
+# Install with: pip install -r requirements-dev.txt
+#
+# This will also install production dependencies from python/requirements.txt
+
+# First install production dependencies
+-r python/requirements.txt
+
+# Testing frameworks
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-xdist>=3.0.0          # Parallel test execution
+
+# Code quality - Formatting
+black>=24.0.0                # Code formatter
+isort>=5.13.0                # Import sorter
+
+# Code quality - Linting
+ruff>=0.2.0                  # Fast linter with auto-fix
+flake8>=7.0.0                # Style checker
+mypy>=1.8.0                  # Type checker
+
+# Pre-commit hooks
+pre-commit>=3.0.0
+
+# Coverage reporting
+coverage[toml]>=7.0.0
+
+# Build tools (if not already in production)
+build>=0.10.0
+wheel>=0.40.0
+setuptools>=60.0.0
+cython>=0.29.0               # Already in python/requirements.txt but listed for clarity
+
+# Documentation (optional)
+# sphinx>=6.0.0
+# sphinx-rtd-theme>=1.0.0
+
+# Development utilities
+ipython>=8.0.0               # Better REPL
+ipdb>=0.13.0                 # Better debugger
+
+# Optional: Notebook support
+# jupyter>=1.0.0
+# notebook>=6.0.0

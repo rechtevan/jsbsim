@@ -1,0 +1,63 @@
+# Coverage.py configuration for JSBSim Python code
+
+[run]
+# Files to measure coverage for
+source =
+    tests
+    python
+
+# Omit specific files/patterns
+omit =
+    */test_*.py
+    */__pycache__/*
+    */site-packages/*
+    .local/*
+    build/*
+    build-coverage/*
+
+# Branch coverage
+branch = True
+
+# Parallel mode for multiple processes
+parallel = True
+
+[report]
+# Reporting options
+precision = 2
+show_missing = True
+skip_covered = False
+skip_empty = True
+
+# Exclude lines from coverage
+exclude_lines =
+    # Have to re-enable the standard pragma
+    pragma: no cover
+
+    # Don't complain about missing debug-only code:
+    def __repr__
+    if self\.debug
+
+    # Don't complain if tests don't hit defensive assertion code:
+    raise AssertionError
+    raise NotImplementedError
+
+    # Don't complain if non-runnable code isn't run:
+    if 0:
+    if False:
+    if __name__ == .__main__.:
+
+    # Type checking code
+    if TYPE_CHECKING:
+    @overload
+
+[html]
+# HTML report directory
+directory = .local/coverage/python-htmlcov
+
+[xml]
+# XML report for CI/CD
+output = .local/coverage/python-coverage.xml
+
+[json]
+# JSON report
+output = .local/coverage/python-coverage.json

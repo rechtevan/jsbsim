@@ -1,0 +1,239 @@
+# Python project configuration for JSBSim
+# https://peps.python.org/pep-0518/
+
+[build-system]
+requires = ["setuptools>=60.0.0", "wheel", "cython"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jsbsim"
+dynamic = ["version"]
+description = "JSBSim Flight Dynamics Model"
+readme = "README.md"
+license = {text = "LGPL-2.1"}
+authors = [
+    {name = "JSBSim Development Team"}
+]
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.20",
+    "cython",
+    "pandas",
+    "scipy",
+    "setuptools>=60.0.0",
+]
+
+[project.optional-dependencies]
+# Development dependencies
+# Install with: pip install -e ".[dev]"
+# Or use: pip install -r requirements-dev.txt
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-xdist>=3.0.0",
+    "black>=24.0.0",
+    "ruff>=0.2.0",
+    "flake8>=7.0.0",
+    "isort>=5.13.0",
+    "mypy>=1.8.0",
+    "pre-commit>=3.0.0",
+    "coverage[toml]>=7.0.0",
+    "build>=0.10.0",
+    "wheel>=0.40.0",
+    "ipython>=8.0.0",
+    "ipdb>=0.13.0",
+]
+
+# Documentation dependencies
+docs = [
+    "sphinx>=6.0.0",
+    "sphinx-rtd-theme>=1.0.0",
+]
+
+# All optional dependencies
+all = [
+    "jsbsim[dev,docs]",
+]
+
+# =============================================================================
+# Black Configuration
+# =============================================================================
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311', 'py312']
+exclude = '''
+/(
+    \.git
+  | \.github
+  | \.local
+  | \.pytest_cache
+  | \.mypy_cache
+  | __pycache__
+  | build
+  | build-.*
+  | dist
+  | \.eggs
+  | \.tox
+)/
+'''
+
+# =============================================================================
+# isort Configuration
+# =============================================================================
+[tool.isort]
+profile = "black"
+line_length = 100
+skip = [
+    ".git",
+    ".local",
+    "build",
+    "build-coverage",
+    "build-python-coverage",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+]
+skip_gitignore = true
+
+# Import order
+known_first_party = ["jsbsim"]
+known_third_party = ["numpy", "pandas", "scipy", "cython"]
+
+# =============================================================================
+# mypy Configuration
+# =============================================================================
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+no_strict_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+check_untyped_defs = true
+
+# Exclude directories
+exclude = [
+    "tests/",
+    "setup.py",
+    "build/",
+    "build-*/",
+    ".local/",
+]
+
+# =============================================================================
+# pytest Configuration
+# =============================================================================
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["Test*.py", "Check*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+    "--color=yes",
+]
+
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: integration tests",
+    "unit: unit tests",
+]
+
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+# =============================================================================
+# coverage Configuration
+# =============================================================================
+[tool.coverage.run]
+source = ["tests", "python"]
+omit = [
+    "*/test_*.py",
+    "*/__pycache__/*",
+    "*/site-packages/*",
+    ".local/*",
+    "build/*",
+    "build-*/*",
+]
+branch = true
+parallel = true
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+skip_empty = true
+sort = "Cover"
+
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if __name__ == .__main__.:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if False:",
+    "if TYPE_CHECKING:",
+    "@overload",
+]
+
+[tool.coverage.html]
+directory = ".local/coverage/python-htmlcov"
+
+[tool.coverage.xml]
+output = ".local/coverage/python-coverage.xml"
+
+# =============================================================================
+# ruff Configuration
+# =============================================================================
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+exclude = [
+    ".git",
+    ".local",
+    "build",
+    "build-*",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    "dist",
+    ".eggs",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "ARG", # flake8-unused-arguments
+]
+
+ignore = [
+    "E501",  # line too long (handled by black)
+    "B008",  # function call in argument defaults
+    "B904",  # raise from None
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403"]  # Unused imports
+"tests/*" = ["ARG", "B"]  # Test files can be more lenient
+
+[tool.ruff.lint.isort]
+known-first-party = ["jsbsim"]
+known-third-party = ["numpy", "pandas", "scipy", "cython"]
