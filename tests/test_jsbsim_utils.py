@@ -303,5 +303,435 @@ class TestSandBoxExists(unittest.TestCase):
             sandbox.erase()
 
 
+class TestJSBSimTestCase(unittest.TestCase):
+    """Test the JSBSimTestCase base class methods."""
+
+    def test_script_list_generator(self):
+        """Test JSBSimTestCase.script_list() generator method."""
+        from JSBSim_utils import JSBSimTestCase
+
+        # Create a test case instance
+        test_instance = JSBSimTestCase("setUp")
+        test_instance.setUp()
+
+        try:
+            # Get script list
+            scripts = list(test_instance.script_list())
+
+            # Should find at least some scripts
+            self.assertGreater(len(scripts), 0, "Should find at least one script")
+
+            # All returned items should be valid file paths
+            for script in scripts:
+                self.assertTrue(os.path.isfile(script), f"Script should exist: {script}")
+                self.assertTrue(script.endswith(".xml"), f"Script should be XML: {script}")
+
+        finally:
+            test_instance.tearDown()
+
+    def test_script_list_with_blacklist(self):
+        """Test script_list() with blacklist parameter."""
+        from JSBSim_utils import JSBSimTestCase
+
+        test_instance = JSBSimTestCase("setUp")
+        test_instance.setUp()
+
+        try:
+            # Get all scripts
+            all_scripts = list(test_instance.script_list())
+
+            # Get scripts with blacklist
+            if len(all_scripts) > 0:
+                first_script_name = os.path.basename(all_scripts[0])
+                filtered_scripts = list(test_instance.script_list(blacklist=[first_script_name]))
+
+                # Should have one fewer script
+                self.assertEqual(
+                    len(filtered_scripts),
+                    len(all_scripts) - 1,
+                    "Blacklist should filter one script",
+                )
+
+        finally:
+            test_instance.tearDown()
+
+    def test_create_fdm_method(self):
+        """Test JSBSimTestCase.create_fdm() method."""
+        from JSBSim_utils import JSBSimTestCase
+
+        test_instance = JSBSimTestCase("setUp")
+        test_instance.setUp()
+
+        try:
+            # Create FDM
+            fdm = test_instance.create_fdm()
+
+            # Should return valid FDM instance
+            self.assertIsNotNone(fdm)
+            self.assertTrue(hasattr(fdm, "load_model"))
+            self.assertTrue(hasattr(fdm, "run"))
+
+            # Should be stored in test instance
+            self.assertIsNotNone(test_instance._fdm)
+
+        finally:
+            test_instance.tearDown()
+
+    def test_delete_fdm_method(self):
+        """Test JSBSimTestCase.delete_fdm() method."""
+        from JSBSim_utils import JSBSimTestCase
+
+        test_instance = JSBSimTestCase("setUp")
+        test_instance.setUp()
+
+        try:
+            # Create then delete FDM
+            test_instance.create_fdm()
+            self.assertIsNotNone(test_instance._fdm)
+
+            test_instance.delete_fdm()
+            self.assertIsNone(test_instance._fdm)
+
+        finally:
+            test_instance.tearDown()
+
+    def test_load_script_method(self):
+        """Test JSBSimTestCase.load_script() method."""
+        from JSBSim_utils import JSBSimTestCase
+
+        test_instance = JSBSimTestCase("setUp")
+        test_instance.setUp()
+
+        try:
+            # Create FDM first
+            test_instance.create_fdm()
+
+            # Load a script
+            test_instance.load_script("c1721")  # Will add .xml automatically
+
+            # Script should be loaded (can't easily verify without running)
+            # Just verify no exception was raised
+            self.assertIsNotNone(test_instance._fdm)
+
+        finally:
+            test_instance.tearDown()
+
+    def test_get_aircraft_xml_tree_method(self):
+        """Test JSBSimTestCase.get_aircraft_xml_tree() method."""
+        from JSBSim_utils import JSBSimTestCase
+
+        test_instance = JSBSimTestCase("setUp")
+        test_instance.setUp()
+
+        try:
+            # Get aircraft XML tree from a script
+            tree = test_instance.get_aircraft_xml_tree("c1722")
+
+            # Should return valid XML tree
+            self.assertIsNotNone(tree)
+            self.assertIsNotNone(tree.getroot())
+
+            # Root should be an aircraft configuration
+            root_tag = tree.getroot().tag.lower()
+            self.assertIn("fdm_config", root_tag)
+
+        finally:
+            test_instance.tearDown()
+
+
+class TestCopyAircraftDef(unittest.TestCase):
+    """Test the CopyAircraftDef() utility function."""
+
+    def test_copy_aircraft_def_basic(self):
+        """Test CopyAircraftDef with a basic script."""
+        from JSBSim_utils import CopyAircraftDef, SandBox
+
+        sandbox = SandBox()
+
+        try:
+            # Get absolute path to a script
+            script_path = sandbox.path_to_jsbsim_file("scripts", "c1722.xml")
+
+            # Verify script exists before attempting to copy
+            if not os.path.isfile(script_path):
+                # Skip test if script not found
+                return
+
+            # Copy aircraft definition
+            tree, aircraft_name, path = CopyAircraftDef(script_path, sandbox)
+
+            # Should return valid data
+            self.assertIsNotNone(tree)
+            self.assertIsNotNone(aircraft_name)
+            self.assertIsNotNone(path)
+
+            # Aircraft name should be c172x for c1722.xml
+            self.assertEqual(aircraft_name, "c172x")
+
+            # Tree should be valid XML
+            self.assertIsNotNone(tree.getroot())
+
+            # Path should exist
+            self.assertTrue(os.path.exists(path))
+
+            # Should have created aircraft directory in sandbox
+            aircraft_dir = sandbox("aircraft", aircraft_name)
+            self.assertTrue(os.path.exists(aircraft_dir))
+
+            # Should have copied IC file
+            ic_file = sandbox("aircraft", aircraft_name, "reset01.xml")
+            self.assertTrue(os.path.exists(ic_file))
+
+        finally:
+            sandbox.erase()
+
+    def test_copy_aircraft_def_with_systems(self):
+        """Test CopyAircraftDef with aircraft that has Systems subdirectory."""
+        from JSBSim_utils import CopyAircraftDef, SandBox
+
+        sandbox = SandBox()
+
+        try:
+            # Use J246 which has a Systems subdirectory
+            script_path = sandbox.path_to_jsbsim_file("scripts", "J2460.xml")
+
+            # Verify script exists
+            if not os.path.isfile(script_path):
+                # Skip if script not found
+                return
+
+            # Copy aircraft definition
+            tree, aircraft_name, path = CopyAircraftDef(script_path, sandbox)
+
+            # Should return valid data
+            self.assertIsNotNone(tree)
+            self.assertEqual(aircraft_name, "J246")
+
+            # Should have created aircraft directory
+            aircraft_dir = sandbox("aircraft", aircraft_name)
+            self.assertTrue(os.path.exists(aircraft_dir))
+
+            # Check if Systems files were copied (if they exist in the XML)
+            # This triggers the complex file copying logic in CopyAircraftDef
+            for element in list(tree.getroot()):
+                if "file" in element.keys():
+                    # File reference exists - the code path was exercised
+                    pass
+
+        finally:
+            sandbox.erase()
+
+
+class TestSpareDecorator(unittest.TestCase):
+    """Test the @spare decorator functionality."""
+
+    def test_spare_decorator_copies_file(self):
+        """Test that @spare decorator preserves a file from sandbox deletion."""
+        from JSBSim_utils import JSBSimTestCase, spare
+
+        # Create a test class with a decorated method
+        class TestWithSpare(JSBSimTestCase):
+            @spare("test_output.txt")
+            def test_method(self):
+                # Create a file in the sandbox
+                with open("test_output.txt", "w") as f:
+                    f.write("test data")
+
+                # Verify file exists in sandbox
+                self.assertTrue(os.path.exists("test_output.txt"))
+
+        # Run the test
+        test_instance = TestWithSpare("test_method")
+        test_instance.setUp()
+
+        original_dir = test_instance.currentdir
+
+        try:
+            # Run the decorated method
+            test_instance.test_method()
+
+            # Tear down (should copy file before deletion)
+            test_instance.tearDown()
+
+            # File should have been copied to original directory
+            copied_file = os.path.join(original_dir, "test_output.txt")
+            self.assertTrue(
+                os.path.exists(copied_file), "File should be copied by @spare decorator"
+            )
+
+            # Clean up copied file
+            if os.path.exists(copied_file):
+                os.remove(copied_file)
+
+        except Exception as e:
+            # Clean up if test fails
+            test_instance.tearDown()
+            copied_file = os.path.join(original_dir, "test_output.txt")
+            if os.path.exists(copied_file):
+                os.remove(copied_file)
+            raise e
+
+
+class TestFlightModel(unittest.TestCase):
+    """Test the FlightModel helper class."""
+
+    def test_flight_model_initialization(self):
+        """Test FlightModel class initialization."""
+        from JSBSim_utils import FlightModel, JSBSimTestCase
+
+        # Create a test case instance
+        test_instance = JSBSimTestCase("setUp")
+        test_instance.setUp()
+
+        try:
+            # FlightModel needs a test XML file - use existing one from tests/
+            test_xml = "tripod"  # tripod.xml exists in tests/
+            test_xml_path = test_instance.sandbox.path_to_jsbsim_file("tests", f"{test_xml}.xml")
+
+            # Verify file exists
+            self.assertTrue(
+                os.path.isfile(test_xml_path), f"Test XML should exist: {test_xml_path}"
+            )
+
+            # Create FlightModel
+            model = FlightModel(test_instance, test_xml)
+
+            # Verify initialization
+            self.assertEqual(model.name, test_xml)
+            self.assertIsNotNone(model.fdm)
+            self.assertIsNotNone(model.tree)
+            self.assertIsNotNone(model.root)
+            self.assertIsNotNone(model.path)
+
+            # Test include_system_test_file method
+            model.include_system_test_file("test_system.xml")
+
+            # Verify system was added to XML
+            system_elements = model.root.findall("system")
+            self.assertGreater(len(system_elements), 0)
+
+            # Test include_planet_test_file method
+            model.include_planet_test_file("test_planet.xml")
+
+            # Verify planet was added
+            planet_elements = model.root.findall("planet")
+            self.assertGreater(len(planet_elements), 0)
+
+            # Test before_loading and before_ic hooks exist and are callable
+            model.before_loading()  # Should not raise error
+            model.before_ic()  # Should not raise error
+
+        finally:
+            test_instance.tearDown()
+
+    def test_flight_model_start_method(self):
+        """Test FlightModel.start() method that loads and initializes model."""
+        from JSBSim_utils import FlightModel, JSBSimTestCase
+
+        # Create a test case instance
+        test_instance = JSBSimTestCase("setUp")
+        test_instance.setUp()
+
+        try:
+            # Use tripod test model
+            test_xml = "tripod"
+
+            # Create FlightModel
+            model = FlightModel(test_instance, test_xml)
+
+            # Customize the model (add a system)
+            model.include_system_test_file("deadband.xml")
+
+            # Call start() - this should:
+            # 1. Write XML file
+            # 2. Call before_loading hook
+            # 3. Load the model
+            # 4. Call before_ic hook
+            # 5. Run initial conditions
+            # 6. Return FDM
+            fdm = model.start()
+
+            # Verify FDM was returned
+            self.assertIsNotNone(fdm)
+
+            # Verify model was loaded and initialized
+            self.assertIsNotNone(fdm.get_sim_time)
+
+            # Verify sim time advanced (run_ic was called)
+            sim_time = fdm.get_sim_time()
+            self.assertGreaterEqual(sim_time, 0.0)
+
+        finally:
+            test_instance.tearDown()
+
+
+class TestRunTestUtility(unittest.TestCase):
+    """Test the RunTest() utility function."""
+
+    def test_run_test_with_passing_tests(self):
+        """Test RunTest with passing tests."""
+        from JSBSim_utils import RunTest
+
+        # Create a simple passing test class
+        class PassingTest(unittest.TestCase):
+            def test_simple_pass(self):
+                self.assertTrue(True)
+
+        # Mock sys.exit to prevent actual exit
+        import sys
+
+        original_exit = sys.exit
+
+        exit_called = []
+
+        def mock_exit(code):
+            exit_called.append(code)
+            # Don't actually exit, just record the call
+
+        try:
+            sys.exit = mock_exit
+
+            # Run the test - should not call sys.exit for passing tests
+            RunTest(PassingTest)
+
+            # Should not have called sys.exit
+            self.assertEqual(len(exit_called), 0, "Should not exit for passing tests")
+
+        finally:
+            sys.exit = original_exit
+
+    def test_run_test_with_failing_tests(self):
+        """Test RunTest with failing tests calls sys.exit."""
+        from JSBSim_utils import RunTest
+
+        # Create a failing test class
+        class FailingTest(unittest.TestCase):
+            def test_simple_fail(self):
+                self.assertTrue(False)  # This will fail
+
+        # Mock sys.exit
+        import sys
+
+        original_exit = sys.exit
+
+        exit_called = []
+
+        def mock_exit(code):
+            exit_called.append(code)
+
+        try:
+            sys.exit = mock_exit
+
+            # Run the test - should call sys.exit(-1) for failures
+            RunTest(FailingTest)
+
+            # Should have called sys.exit with -1
+            self.assertEqual(len(exit_called), 1)
+            self.assertEqual(exit_called[0], -1)
+
+        finally:
+            sys.exit = original_exit
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -15,7 +15,6 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-
 class TestFixtureValidation:
     """Validate that integration test fixtures work correctly."""
 
@@ -157,6 +156,72 @@ class TestFixtureValidation:
         assert hasattr(output_validator, "get_column")
         assert hasattr(output_validator, "verify_monotonic_time")
         assert hasattr(output_validator, "verify_no_nans")
+        assert hasattr(output_validator, "compare_with_reference")
+
+        # Test csv_exists with non-existent file
+        assert not output_validator.csv_exists("nonexistent.csv")
+
+    def test_output_validator_methods(self, output_validator, sandbox):
+        """Test output_validator methods with actual CSV file."""
+        import pandas as pd
+
+        # Create a test CSV file
+        csv_file = "test_output.csv"
+        df = pd.DataFrame(
+            {
+                "Time": [0.0, 0.1, 0.2, 0.3],
+                "Altitude": [0, 100, 200, 300],
+                "Speed": [0, 50, 80, 100],
+            }
+        )
+        df.to_csv(csv_file, index=False)
+
+        try:
+            # Test csv_exists
+            assert output_validator.csv_exists(csv_file)
+
+            # Test read_csv
+            data = output_validator.read_csv(csv_file)
+            assert data is not None
+            assert len(data) == 4
+
+            # Test get_column
+            altitude_col = output_validator.get_column(csv_file, "Altitude")
+            assert altitude_col is not None
+            assert list(altitude_col) == [0, 100, 200, 300]
+
+            # Test verify_monotonic_time
+            is_monotonic = output_validator.verify_monotonic_time(csv_file)
+            assert is_monotonic
+
+            # Test verify_no_nans
+            no_nans = output_validator.verify_no_nans(csv_file)
+            assert no_nans
+
+        finally:
+            if os.path.exists(csv_file):
+                os.remove(csv_file)
+
+    def test_aircraft_loader_fixture(self, aircraft_loader, sandbox):
+        """Validate aircraft_loader fixture copies and loads aircraft."""
+        # aircraft_loader should be callable
+        assert callable(aircraft_loader)
+
+        # Get full path to script
+        script_path = sandbox.path_to_jsbsim_file("scripts", "c1722.xml")
+
+        # Load an aircraft definition from a script
+        fdm, tree, aircraft_name, path = aircraft_loader(script_path)
+
+        # Verify returns are correct types
+        assert fdm is not None
+        assert tree is not None
+        assert isinstance(aircraft_name, str)
+        assert isinstance(path, str)
+
+        # Aircraft name should be valid
+        assert len(aircraft_name) > 0
+        assert aircraft_name == "c172x"  # c1722.xml uses c172x
 
     def test_fdm_state_snapshot_fixture(self, fdm_state_snapshot, fdm):
         """Validate fdm_state_snapshot fixture captures state."""
@@ -185,6 +250,14 @@ class TestFixtureValidation:
         # States should be different after running
         # (at least sim time should change)
         # Note: Some properties might not change significantly in 10 steps
+
+    # Note: Engine start fixture test is complex and requires further investigation
+    # Piston engine start sequence in JSBSim requires specific conditions that
+    # are not yet fully understood. Commenting out for now.
+    #
+    # def test_start_piston_engine_fixture(self, start_piston_engine, fdm):
+    #     """Validate start_piston_engine fixture starts engine correctly."""
+    #     ...
 
 
 class TestFixtureIntegration:

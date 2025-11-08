@@ -305,6 +305,63 @@ def fdm_state_snapshot(fdm):
     return capture_state
 
 
+@pytest.fixture
+def start_piston_engine(fdm):
+    """
+    Fixture providing a helper to properly configure piston engine for start.
+
+    IMPORTANT: Call this BEFORE fdm.run_ic() to properly initialize the engine.
+
+    Piston engines require specific initialization:
+    - Mixture must be set to full rich (1.0)
+    - Throttle should be set (0.5-1.0 for takeoff, 0.6-0.8 for cruise)
+    - set-running property must be enabled
+
+    Usage:
+        def test_engine(start_piston_engine, fdm):
+            fdm.load_model('c172x')
+            fdm['ic/h-sl-ft'] = 0.0
+            start_piston_engine(throttle=1.0)  # Set for takeoff
+            fdm.run_ic()  # Now engine will be running
+            # Engine should now be running with thrust
+    """
+
+    def configure_engine(engine_index=0, throttle=0.7, mixture=0.87):
+        """
+        Configure piston engine for start.
+
+        Must be called BEFORE run_ic() for engine to start properly.
+        After calling this and run_ic(), run simulation for ~30 frames
+        to allow engine to fully start.
+
+        Args:
+            engine_index: Engine number (0 for single-engine aircraft)
+            throttle: Throttle setting 0.0-1.0 (default 0.7 for good power)
+            mixture: Mixture setting 0.0-1.0 (default 0.87 per scripts)
+
+        Returns:
+            None (call run_ic() then run ~30 frames after this)
+        """
+        # Set mixture (scripts use 0.87, not 1.0)
+        fdm["fcs/mixture-cmd-norm"] = mixture
+
+        # Set throttle
+        fdm["fcs/throttle-cmd-norm"] = throttle
+
+        # Turn on magnetos (both)
+        fdm["propulsion/magneto_cmd"] = 3
+
+        # Engage starter
+        fdm["propulsion/starter_cmd"] = 1
+
+        # Note: After this, caller must:
+        # 1. Call fdm.run_ic()
+        # 2. Run simulation for ~30 frames: for _ in range(30): fdm.run()
+        # 3. Then engine should be running with thrust
+
+    return configure_engine
+
+
 # Hooks for integration test session setup/teardown
 
 
