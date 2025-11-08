@@ -20,6 +20,71 @@ Use `.local/` for:
 - Temporary scripts and diagrams
 - Any AI-generated content not part of the codebase
 
+## Code Quality and Linting
+
+**Pre-commit Hooks**: This repository uses pre-commit hooks for automated code quality checks. Hooks run automatically on `git commit`.
+
+### Configured Linters and Formatters
+
+**Python:**
+- `black` - Code formatting (automatic fixes)
+- `ruff` - Fast linting with auto-fixes
+- `flake8` - Style checking
+- `isort` - Import sorting
+- `mypy` - Type checking (when configured)
+
+**Markdown:**
+- `markdownlint` - Markdown linting with auto-fixes
+  - Disabled rules: MD013 (line length), MD033 (inline HTML), MD041 (first line h1)
+
+**General:**
+- Trailing whitespace trimming
+- End-of-file newline enforcement
+- Mixed line ending fixes
+- Large file detection
+- Merge conflict marker detection
+- Private key detection (security)
+
+**Language-Specific (when files present):**
+- CMake formatting and linting
+- XML validation (JSBSim config files)
+- YAML/JSON/TOML syntax checking
+
+### Pre-commit Commands
+
+```bash
+# Install pre-commit hooks
+pre-commit install
+
+# Run hooks manually on all files
+pre-commit run --all-files
+
+# Run specific hook
+pre-commit run black --all-files
+
+# Skip hooks for a commit (use sparingly)
+git commit --no-verify -m "message"
+```
+
+### Coverage Tracking
+
+**C++ Code Coverage** (Primary - 90% goal):
+- Tool: gcov/lcov
+- Workflow: `.github/workflows/coverage.yml`
+- Local build: `cmake -DENABLE_COVERAGE=ON` then `make lcov`
+- Reports generated in `build/lcov/html/`
+- **Issue:** Create dedicated issue for C++ coverage infrastructure improvements
+
+**Python Test Coverage** (Secondary - 80% goal):
+- Tool: pytest-cov with coverage.py
+- Command: `pytest --cov=tests --cov-report=html`
+- Reports in `.local/coverage/`
+- **Issue:** #8
+
+**Other Languages:**
+- Julia: Issue #9
+- MATLAB/Octave: Issue #10
+
 ## Overview
 
 JSBSim is a multi-platform Flight Dynamics Model (FDM) written in C++17. It's a physics and math model that simulates aircraft/rocket movement under applied forces and moments. The library can run standalone or integrate with simulation environments like Unreal Engine, FlightGear, and drone autopilot systems (ArduPilot, PX4).
