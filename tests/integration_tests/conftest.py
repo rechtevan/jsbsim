@@ -308,58 +308,80 @@ def fdm_state_snapshot(fdm):
 @pytest.fixture
 def start_piston_engine(fdm):
     """
-    Fixture providing a helper to properly configure piston engine for start.
+    Fixture providing a helper to properly start piston engines.
 
-    IMPORTANT: Call this BEFORE fdm.run_ic() to properly initialize the engine.
+    CORRECT SEQUENCE (based on investigation):
+    1. Load model and set ICs
+    2. Call run_ic()
+    3. Call this function
+    4. Engine will be running after ~2 seconds
 
-    Piston engines require specific initialization:
-    - Mixture must be set to full rich (1.0)
-    - Throttle should be set (0.5-1.0 for takeoff, 0.6-0.8 for cruise)
-    - set-running property must be enabled
+    Piston engines require magneto + starter sequence and take time to crank.
+    Simply setting set-running=1 does NOT work.
 
     Usage:
         def test_engine(start_piston_engine, fdm):
             fdm.load_model('c172x')
             fdm['ic/h-sl-ft'] = 0.0
-            start_piston_engine(throttle=1.0)  # Set for takeoff
-            fdm.run_ic()  # Now engine will be running
-            # Engine should now be running with thrust
+            fdm.run_ic()
+            start_piston_engine(throttle=0.6)  # Returns when engine running
+            # Engine is now running with thrust
     """
 
-    def configure_engine(engine_index=0, throttle=0.7, mixture=0.87):
+    def start_engine(engine_index=0, throttle=0.6, mixture=None, crank_time=2.5):
         """
-        Configure piston engine for start.
+        Start a piston engine using magneto + starter sequence.
 
-        Must be called BEFORE run_ic() for engine to start properly.
-        After calling this and run_ic(), run simulation for ~30 frames
-        to allow engine to fully start.
+        Must be called AFTER run_ic().
 
         Args:
             engine_index: Engine number (0 for single-engine aircraft)
-            throttle: Throttle setting 0.0-1.0 (default 0.7 for good power)
-            mixture: Mixture setting 0.0-1.0 (default 0.87 per scripts)
+            throttle: Throttle setting 0.0-1.0 (default 0.6 for good idle)
+            mixture: Mixture setting 0.0-1.0 (None = auto based on altitude)
+            crank_time: Time to crank in seconds (default 2.5)
 
         Returns:
-            None (call run_ic() then run ~30 frames after this)
+            True if engine started successfully, False otherwise
         """
-        # Set mixture (scripts use 0.87, not 1.0)
+        # Auto-calculate mixture based on altitude if not specified
+        if mixture is None:
+            altitude = fdm["position/h-sl-ft"]
+            # Mixture adjustment for altitude (richer at altitude)
+            if altitude < 3000:
+                mixture = 0.87  # Sea level to 3000 ft
+            elif altitude < 6000:
+                mixture = 0.92  # 3000-6000 ft
+            else:
+                mixture = 1.0  # Above 6000 ft (full rich)
+
+        # Set mixture
         fdm["fcs/mixture-cmd-norm"] = mixture
 
         # Set throttle
         fdm["fcs/throttle-cmd-norm"] = throttle
 
-        # Turn on magnetos (both)
+        # Turn on magnetos (both = 3)
         fdm["propulsion/magneto_cmd"] = 3
 
         # Engage starter
         fdm["propulsion/starter_cmd"] = 1
 
-        # Note: After this, caller must:
-        # 1. Call fdm.run_ic()
-        # 2. Run simulation for ~30 frames: for _ in range(30): fdm.run()
-        # 3. Then engine should be running with thrust
+        # Crank engine - run simulation for specified time
+        # At 120 Hz, 2.5 seconds = 300 frames
+        dt = fdm["simulation/dt"]
+        frames_to_crank = int(crank_time / dt)
 
-    return configure_engine
+        for _ in range(frames_to_crank):
+            fdm.run()
+
+        # Disengage starter
+        fdm["propulsion/starter_cmd"] = 0
+
+        # Check if engine is running
+        running = fdm["propulsion/engine/set-running"]
+        return running > 0
+
+    return start_engine
 
 
 # Hooks for integration test session setup/teardown

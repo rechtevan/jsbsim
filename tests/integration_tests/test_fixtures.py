@@ -251,13 +251,27 @@ class TestFixtureValidation:
         # (at least sim time should change)
         # Note: Some properties might not change significantly in 10 steps
 
-    # Note: Engine start fixture test is complex and requires further investigation
-    # Piston engine start sequence in JSBSim requires specific conditions that
-    # are not yet fully understood. Commenting out for now.
-    #
-    # def test_start_piston_engine_fixture(self, start_piston_engine, fdm):
-    #     """Validate start_piston_engine fixture starts engine correctly."""
-    #     ...
+    def test_start_piston_engine_fixture(self, start_piston_engine, fdm):
+        """Validate start_piston_engine fixture starts engine correctly."""
+        # Load model
+        fdm.load_model("c172x")
+        fdm["ic/h-sl-ft"] = 1000.0  # Low altitude for easier start
+        fdm.run_ic()
+
+        # start_piston_engine should be callable
+        assert callable(start_piston_engine)
+
+        # Start engine using magneto + starter sequence
+        success = start_piston_engine(throttle=0.6, crank_time=2.5)
+        assert success, "Engine should start successfully with magneto + starter"
+
+        # Verify engine is running
+        running = fdm["propulsion/engine/set-running"]
+        assert running > 0, "Engine should be running after start"
+
+        # Verify engine producing thrust
+        thrust = fdm["propulsion/engine/thrust-lbs"]
+        assert thrust > 0, "Engine should produce thrust when running"
 
 
 class TestFixtureIntegration:
