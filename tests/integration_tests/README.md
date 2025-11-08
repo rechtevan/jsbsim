@@ -16,63 +16,111 @@ Integration tests verify that multiple components of JSBSim work correctly toget
 
 These tests are designed to increase code coverage from 24.9% to 40%+ by exercising realistic flight scenarios:
 
-### Tier 1 - Critical (Foundation)
+### Phase 1 - Framework (COMPLETED)
 1. **test_01_aircraft_loading.py** - Aircraft loading and property initialization (+2-3% coverage)
    - Tests FGFDMExec, FGXMLElement, FGPropertyManager, FGAircraft
    - Verifies aircraft can be loaded and properties initialized
    - Foundation test for all others
 
-2. **test_02_steady_level_flight.py** - Full simulation loop testing (+3-4% coverage) *[TODO]*
-   - Tests all models working together in sequence
-   - Verifies trimmed flight stability
+### Phase 2 - Flight Scenarios (COMPLETED)
+2. **test_02_takeoff_sequence.py** - Ground to flight transition (+3-4% coverage)
+   - Tests takeoff roll, rotation, and initial climb
+   - Validates ground-to-air transition dynamics
 
-### Tier 2 - High Priority (Flight Dynamics)
-3. **test_03_takeoff_sequence.py** - Ground to flight transition (+3-4% coverage) *[TODO]*
-4. **test_04_coordinated_turn.py** - Flight control system testing (+2-3% coverage) *[TODO]*
-5. **test_05_landing_approach.py** - Descent and landing dynamics (+2-3% coverage) *[TODO]*
+3. **test_03_landing_approach.py** - Descent and landing dynamics (+2-3% coverage)
+   - Tests approach, flare, and touchdown
+   - Validates landing gear and ground contact
 
-### Tier 3 - Supporting (Subsystems)
-6. **test_06_propulsion_dynamics.py** - Engine and propulsion testing (+2-3% coverage) *[TODO]*
-7. **test_07_aero_coefficients.py** - Aerodynamic table interpolation (+2-3% coverage) *[TODO]*
-8. **test_08_atmospheric_model.py** - Atmosphere model validation (+2-3% coverage) *[TODO]*
-9. **test_09_fuel_mass_balance.py** - Fuel consumption and CG effects (+1-2% coverage) *[TODO]*
-10. **test_10_script_execution.py** - Script parsing and event handling (+2% coverage) *[TODO]*
+4. **test_04_climb_descent.py** - Climb and descent scenarios (+2-3% coverage)
+   - Tests altitude changes and energy management
+   - Validates vertical navigation
+
+5. **test_05_coordinated_turns.py** - Flight control system testing (+2-3% coverage)
+   - Tests coordinated turns and bank angles
+   - Validates lateral-directional dynamics
+
+### Phase 3 - Script Execution (COMPLETED)
+6. **test_06_script_execution.py** - Script parsing and execution (+3-4% coverage)
+   - Tests script loading and completion
+   - Validates simulation sequencing
+
+7. **test_07_events_conditions.py** - Event system and conditions (+2-3% coverage)
+   - Tests event triggering and condition evaluation
+   - Validates scripted automation
+
+### Phase 4 - Advanced Testing (COMPLETED)
+8. **test_08_initialization_trimming.py** - Initialization and trimming (+4-5% coverage)
+   - Unit tests: IC parameter setting and validation
+   - Integration tests: Trim convergence and subsystem coordination
+   - E2E tests: Complete trim workflows and linearization
+
+9. **test_09_subsystem_interactions.py** - Subsystem interactions (+4-5% coverage)
+   - Unit tests: Subsystem interface validation
+   - Integration tests: Multi-subsystem coordination
+   - E2E tests: Complete flights with all subsystems
+
+10. **test_10_aircraft_specific_scenarios.py** - Aircraft-specific E2E (+3-4% coverage)
+    - C172: General aviation scenarios
+    - F-16: High-performance flight
+    - Ball: Basic physics validation
+    - 737: Commercial transport operations
 
 **Expected total coverage gain: +15-20% (from 24.9% to 40%+)**
+
+**Status**: Phase 4 tests implemented. Some tests require debugging for aircraft configuration and IC setup issues.
 
 ## Directory Structure
 
 ```
 tests/integration_tests/
-├── __init__.py                      # Package initialization
-├── conftest.py                      # Integration-specific fixtures
-├── README.md                        # This file
-├── test_01_aircraft_loading.py     # Scenario 1 (IMPLEMENTED)
-└── test_02_*.py                     # Additional scenarios (TODO)
+├── __init__.py                           # Package initialization
+├── conftest.py                           # Integration-specific fixtures
+├── README.md                             # This file
+├── test_01_aircraft_loading.py          # Phase 1: Aircraft loading
+├── test_02_takeoff_sequence.py          # Phase 2: Takeoff scenarios
+├── test_03_landing_approach.py          # Phase 2: Landing scenarios
+├── test_04_climb_descent.py             # Phase 2: Climb/descent
+├── test_05_coordinated_turns.py         # Phase 2: Coordinated turns
+├── test_06_script_execution.py          # Phase 3: Script execution
+├── test_07_events_conditions.py         # Phase 3: Events and conditions
+├── test_08_initialization_trimming.py   # Phase 4: Init and trimming
+├── test_09_subsystem_interactions.py    # Phase 4: Subsystem interactions
+└── test_10_aircraft_specific_scenarios.py  # Phase 4: Aircraft-specific tests
 ```
 
 ## Running Integration Tests
+
+**Important**: These integration tests use the unittest framework and should be run directly as Python scripts, not via pytest.
 
 ### Run All Integration Tests
 
 ```bash
 # From the jsbsim root directory
-pytest tests/integration_tests/
+# Set library path and run each test file
+export LD_LIBRARY_PATH=$PWD/build/src:$LD_LIBRARY_PATH
 
-# Or using the integration marker
-pytest -m integration
+# Run all test files
+for test in tests/integration_tests/test_*.py; do
+    python "$test"
+done
 ```
 
 ### Run Specific Test Files
 
 ```bash
-pytest tests/integration_tests/test_script_execution.py
+# Set library path
+export LD_LIBRARY_PATH=$PWD/build/src:$LD_LIBRARY_PATH
+
+# Run specific test
+python tests/integration_tests/test_08_initialization_trimming.py
 ```
 
-### Run with Verbose Output
+### Alternative: Run via pytest (compatibility mode)
+
+Note: Pytest compatibility may be limited. Unittest is recommended.
 
 ```bash
-pytest tests/integration_tests/ -v
+pytest tests/integration_tests/test_01_aircraft_loading.py -v
 ```
 
 ### Run Tests Matching a Pattern
