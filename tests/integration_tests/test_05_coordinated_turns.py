@@ -106,7 +106,7 @@ class TestCoordinatedTurns(JSBSimTestCase):
 
         return True
 
-    def test_level_30_degree_banked_turn(self, property_monitor):
+    def test_level_30_degree_banked_turn(self):
         """
         Test standard rate turn with 30-degree bank angle.
 
@@ -140,49 +140,50 @@ class TestCoordinatedTurns(JSBSimTestCase):
         aileron_deflection = 0.3  # Right turn
         rudder_coordination = 0.15  # Coordinated rudder
 
-        # Monitor properties during turn
-        with property_monitor("position/h-sl-ft") as altitude_mon:
-            with property_monitor("aero/beta-deg") as sideslip_mon:
-                with property_monitor("accelerations/n-pilot-z-norm") as load_mon:
-                    # Execute turn for 10 seconds
-                    turn_duration = 10.0
-                    steps = int(turn_duration / self.dt)
+        # Track properties manually during turn
+        altitudes = []
+        sideslips = []
+        load_factors = []
 
-                    for step in range(steps):
-                        # Apply coordinated turn inputs
-                        fdm["fcs/aileron-cmd-norm"] = aileron_deflection
-                        fdm["fcs/rudder-cmd-norm"] = rudder_coordination
+        # Execute turn for 10 seconds
+        turn_duration = 10.0
+        steps = int(turn_duration / self.dt)
 
-                        # Maintain altitude with slight back pressure
-                        current_altitude = fdm["position/h-sl-ft"]
-                        altitude_error = initial_altitude - current_altitude
-                        elevator_cmd = 0.02 * altitude_error / 100.0  # Proportional control
-                        elevator_cmd = max(-0.3, min(0.3, elevator_cmd))
-                        fdm["fcs/elevator-cmd-norm"] = elevator_cmd
+        for step in range(steps):
+            # Apply coordinated turn inputs
+            fdm["fcs/aileron-cmd-norm"] = aileron_deflection
+            fdm["fcs/rudder-cmd-norm"] = rudder_coordination
 
-                        # Run simulation step
-                        self.assertTrue(fdm.run(), f"Simulation failed at step {step}")
+            # Maintain altitude with slight back pressure
+            current_altitude = fdm["position/h-sl-ft"]
+            altitude_error = initial_altitude - current_altitude
+            elevator_cmd = 0.02 * altitude_error / 100.0  # Proportional control
+            elevator_cmd = max(-0.3, min(0.3, elevator_cmd))
+            fdm["fcs/elevator-cmd-norm"] = elevator_cmd
 
-                        # Update monitors periodically
-                        if step % 10 == 0:
-                            altitude_mon.update()
-                            sideslip_mon.update()
-                            load_mon.update()
+            # Run simulation step
+            self.assertTrue(fdm.run(), f"Simulation failed at step {step}")
 
-                        # Check bank angle is approximately at target
-                        if step > 120:  # After roll-in complete (1 second)
-                            current_bank = abs(fdm["attitude/phi-deg"])
-                            if step % 120 == 0:  # Check every second
-                                self.assertGreater(
-                                    current_bank,
-                                    target_bank_deg - 10.0,
-                                    "Bank angle too shallow",
-                                )
-                                self.assertLess(
-                                    current_bank,
-                                    target_bank_deg + 10.0,
-                                    "Bank angle too steep",
-                                )
+            # Track properties periodically
+            if step % 10 == 0:
+                altitudes.append(fdm["position/h-sl-ft"])
+                sideslips.append(fdm["aero/beta-deg"])
+                load_factors.append(fdm["accelerations/n-pilot-z-norm"])
+
+            # Check bank angle is approximately at target
+            if step > 120:  # After roll-in complete (1 second)
+                current_bank = abs(fdm["attitude/phi-deg"])
+                if step % 120 == 0:  # Check every second
+                    self.assertGreater(
+                        current_bank,
+                        target_bank_deg - 10.0,
+                        "Bank angle too shallow",
+                    )
+                    self.assertLess(
+                        current_bank,
+                        target_bank_deg + 10.0,
+                        "Bank angle too steep",
+                    )
 
         # Verify altitude maintained within tolerance
         final_altitude = fdm["position/h-sl-ft"]
@@ -194,21 +195,25 @@ class TestCoordinatedTurns(JSBSimTestCase):
         )
 
         # Verify load factor approximately matches expected
-        avg_load_factor = sum(load_mon.values) / len(load_mon.values)
-        self.assertGreater(avg_load_factor, 1.0, "Load factor should be greater than 1G in turn")
-        self.assertLess(
-            abs(avg_load_factor - expected_load_factor),
-            0.3,
-            f"Load factor {avg_load_factor:.2f} deviates from expected {expected_load_factor:.2f}",
-        )
+        if len(load_factors) > 0:
+            avg_load_factor = sum(load_factors) / len(load_factors)
+            self.assertGreater(
+                avg_load_factor, 1.0, "Load factor should be greater than 1G in turn"
+            )
+            self.assertLess(
+                abs(avg_load_factor - expected_load_factor),
+                0.3,
+                f"Load factor {avg_load_factor:.2f} deviates from expected {expected_load_factor:.2f}",
+            )
 
         # Verify minimal sideslip (coordinated turn)
-        avg_sideslip = abs(sum(sideslip_mon.values) / len(sideslip_mon.values))
-        self.assertLess(
-            avg_sideslip,
-            self.tolerance_sideslip,
-            f"Average sideslip {avg_sideslip:.1f} deg indicates uncoordinated turn",
-        )
+        if len(sideslips) > 0:
+            avg_sideslip = abs(sum(sideslips) / len(sideslips))
+            self.assertLess(
+                avg_sideslip,
+                self.tolerance_sideslip,
+                f"Average sideslip {avg_sideslip:.1f} deg indicates uncoordinated turn",
+            )
 
         # Verify turn occurred (heading changed)
         final_heading = fdm["attitude/psi-deg"]

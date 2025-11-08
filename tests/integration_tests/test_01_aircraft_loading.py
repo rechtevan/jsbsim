@@ -321,6 +321,9 @@ class TestAircraftLoading(JSBSimTestCase):
         fdm = self.create_fdm()
         fdm.load_model("c172p")
 
+        # Initialize to populate properties
+        fdm.run_ic()
+
         # Verify weight is loaded
         weight = fdm["inertia/weight-lbs"]
         self.assertIsNotNone(weight, "Weight not loaded")
@@ -486,6 +489,9 @@ class TestAircraftLoading(JSBSimTestCase):
 
         # Load a well-formed aircraft
         self.assertTrue(fdm.load_model("c172p"), "Failed to load well-formed aircraft XML")
+
+        # Initialize to populate properties
+        fdm.run_ic()
 
         # Verify that after loading, all expected properties exist
         # This indirectly tests that XML parsing was successful

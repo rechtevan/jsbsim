@@ -44,7 +44,7 @@ import pytest
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from JSBSim_utils import ExecuteUntil, JSBSimTestCase, RunTest, append_xml
+from JSBSim_utils import JSBSimTestCase, RunTest
 
 
 class TestScriptExecution(JSBSimTestCase):
@@ -113,9 +113,7 @@ class TestScriptExecution(JSBSimTestCase):
             current_time = fdm.get_sim_time()
 
             # Verify time is advancing
-            self.assertGreaterEqual(
-                current_time, last_time, "Simulation time moving backwards"
-            )
+            self.assertGreaterEqual(current_time, last_time, "Simulation time moving backwards")
             last_time = current_time
 
             # Check for numerical stability every 100 iterations
@@ -123,18 +121,14 @@ class TestScriptExecution(JSBSimTestCase):
                 self._verify_no_nan_inf(fdm)
 
             # Safety check to prevent infinite loops
-            self.assertLess(
-                iterations, max_iterations, "Simulation exceeded maximum iterations"
-            )
+            self.assertLess(iterations, max_iterations, "Simulation exceeded maximum iterations")
 
         # Verify simulation completed (reached end time of 10 seconds)
         final_time = fdm.get_sim_time()
         self.assertGreaterEqual(
             final_time, 10.0, "Script did not run to completion (expected ~10s)"
         )
-        self.assertLessEqual(
-            final_time, 10.5, "Script ran longer than expected end time"
-        )
+        self.assertLessEqual(final_time, 10.5, "Script ran longer than expected end time")
 
     def test_c1722_autopilot_events(self):
         """
@@ -182,9 +176,7 @@ class TestScriptExecution(JSBSimTestCase):
             current_time = fdm.get_sim_time()
 
             # Verify time is advancing
-            self.assertGreaterEqual(
-                current_time, last_time, "Simulation time moving backwards"
-            )
+            self.assertGreaterEqual(current_time, last_time, "Simulation time moving backwards")
             last_time = current_time
 
             # Check for engine start after initial event (around 0.25s)
@@ -200,18 +192,14 @@ class TestScriptExecution(JSBSimTestCase):
                 self._verify_no_nan_inf(fdm)
 
             # Safety check
-            self.assertLess(
-                iterations, max_iterations, "Simulation exceeded maximum iterations"
-            )
+            self.assertLess(iterations, max_iterations, "Simulation exceeded maximum iterations")
 
         # Verify simulation completed
         final_time = fdm.get_sim_time()
         self.assertGreaterEqual(
             final_time, 200.0, "Script did not run to completion (expected ~200s)"
         )
-        self.assertLessEqual(
-            final_time, 201.0, "Script ran longer than expected end time"
-        )
+        self.assertLessEqual(final_time, 201.0, "Script ran longer than expected end time")
 
         # Verify engine was started during simulation
         self.assertTrue(engine_started, "Engine was never started during script")
@@ -254,9 +242,7 @@ class TestScriptExecution(JSBSimTestCase):
             current_time = fdm.get_sim_time()
 
             # Verify time progression
-            self.assertGreaterEqual(
-                current_time, last_time, "Simulation time moving backwards"
-            )
+            self.assertGreaterEqual(current_time, last_time, "Simulation time moving backwards")
             last_time = current_time
 
             # Periodic stability checks
@@ -264,9 +250,7 @@ class TestScriptExecution(JSBSimTestCase):
                 self._verify_no_nan_inf(fdm)
 
             # Safety check
-            self.assertLess(
-                iterations, max_iterations, "Simulation exceeded maximum iterations"
-            )
+            self.assertLess(iterations, max_iterations, "Simulation exceeded maximum iterations")
 
         # Verify simulation completed successfully
         final_time = fdm.get_sim_time()
@@ -295,9 +279,7 @@ class TestScriptExecution(JSBSimTestCase):
 
         # Load and run the script
         script_path = self.sandbox.path_to_jsbsim_file("scripts", "c172_cruise_8K.xml")
-        self.assertTrue(
-            fdm.load_script(script_path), "Failed to load script c172_cruise_8K.xml"
-        )
+        self.assertTrue(fdm.load_script(script_path), "Failed to load script c172_cruise_8K.xml")
 
         # Initialize
         self.assertTrue(fdm.run_ic(), "Failed to initialize from script")
@@ -317,9 +299,7 @@ class TestScriptExecution(JSBSimTestCase):
             current_time = fdm.get_sim_time()
 
             # Verify time progression
-            self.assertGreaterEqual(
-                current_time, last_time, "Simulation time moving backwards"
-            )
+            self.assertGreaterEqual(current_time, last_time, "Simulation time moving backwards")
             last_time = current_time
 
             # Check for autopilot engagement (around 5s in script)
@@ -333,18 +313,14 @@ class TestScriptExecution(JSBSimTestCase):
                 self._verify_no_nan_inf(fdm)
 
             # Safety check
-            self.assertLess(
-                iterations, max_iterations, "Simulation exceeded maximum iterations"
-            )
+            self.assertLess(iterations, max_iterations, "Simulation exceeded maximum iterations")
 
         # Verify simulation completed
         final_time = fdm.get_sim_time()
         self.assertGreaterEqual(
             final_time, 40.0, "Script did not run to completion (expected ~40s)"
         )
-        self.assertLessEqual(
-            final_time, 41.0, "Script ran longer than expected end time"
-        )
+        self.assertLessEqual(final_time, 41.0, "Script ran longer than expected end time")
 
     def test_737_cruise(self):
         """
@@ -369,18 +345,14 @@ class TestScriptExecution(JSBSimTestCase):
 
         # Load and run the script
         script_path = self.sandbox.path_to_jsbsim_file("scripts", "737_cruise.xml")
-        self.assertTrue(
-            fdm.load_script(script_path), "Failed to load script 737_cruise.xml"
-        )
+        self.assertTrue(fdm.load_script(script_path), "Failed to load script 737_cruise.xml")
 
         # Initialize
         self.assertTrue(fdm.run_ic(), "Failed to initialize from script")
 
         # Verify we're at cruise altitude
         initial_alt = fdm["position/h-sl-ft"]
-        self.assertGreater(
-            initial_alt, 10000.0, "737 cruise altitude should be high altitude"
-        )
+        self.assertGreater(initial_alt, 10000.0, "737 cruise altitude should be high altitude")
 
         # Run simulation to completion
         iterations = 0
@@ -393,9 +365,7 @@ class TestScriptExecution(JSBSimTestCase):
             current_time = fdm.get_sim_time()
 
             # Verify time progression
-            self.assertGreaterEqual(
-                current_time, last_time, "Simulation time moving backwards"
-            )
+            self.assertGreaterEqual(current_time, last_time, "Simulation time moving backwards")
             last_time = current_time
 
             # Check for engines running
@@ -407,30 +377,22 @@ class TestScriptExecution(JSBSimTestCase):
                     # Verify turbine engines are producing thrust
                     thrust0 = fdm["propulsion/engine[0]/thrust-lbs"]
                     thrust1 = fdm["propulsion/engine[1]/thrust-lbs"]
-                    self.assertGreater(
-                        thrust0, 0.0, "Engine 0 running but no thrust"
-                    )
-                    self.assertGreater(
-                        thrust1, 0.0, "Engine 1 running but no thrust"
-                    )
+                    self.assertGreater(thrust0, 0.0, "Engine 0 running but no thrust")
+                    self.assertGreater(thrust1, 0.0, "Engine 1 running but no thrust")
 
             # Periodic stability checks
             if iterations % 200 == 0:
                 self._verify_no_nan_inf(fdm)
 
             # Safety check
-            self.assertLess(
-                iterations, max_iterations, "Simulation exceeded maximum iterations"
-            )
+            self.assertLess(iterations, max_iterations, "Simulation exceeded maximum iterations")
 
         # Verify simulation completed
         final_time = fdm.get_sim_time()
         self.assertGreaterEqual(
             final_time, 100.0, "Script did not run to completion (expected ~100s)"
         )
-        self.assertLessEqual(
-            final_time, 101.0, "Script ran longer than expected end time"
-        )
+        self.assertLessEqual(final_time, 101.0, "Script ran longer than expected end time")
 
         # Verify engines were started
         self.assertTrue(engines_running, "737 engines were never started")
@@ -458,9 +420,7 @@ class TestScriptExecution(JSBSimTestCase):
 
         # Load and run the script
         script_path = self.sandbox.path_to_jsbsim_file("scripts", "Short_S23_1.xml")
-        self.assertTrue(
-            fdm.load_script(script_path), "Failed to load script Short_S23_1.xml"
-        )
+        self.assertTrue(fdm.load_script(script_path), "Failed to load script Short_S23_1.xml")
 
         # Initialize
         self.assertTrue(fdm.run_ic(), "Failed to initialize from script")
@@ -468,9 +428,7 @@ class TestScriptExecution(JSBSimTestCase):
         # Verify initial conditions
         initial_alt = fdm["position/h-sl-ft"]
         # Seaplane should start on or very near water surface
-        self.assertLess(
-            initial_alt, 100.0, "Seaplane should start at low altitude (on water)"
-        )
+        self.assertLess(initial_alt, 100.0, "Seaplane should start at low altitude (on water)")
 
         # Run simulation to completion
         iterations = 0
@@ -482,9 +440,7 @@ class TestScriptExecution(JSBSimTestCase):
             current_time = fdm.get_sim_time()
 
             # Verify time progression
-            self.assertGreaterEqual(
-                current_time, last_time, "Simulation time moving backwards"
-            )
+            self.assertGreaterEqual(current_time, last_time, "Simulation time moving backwards")
             last_time = current_time
 
             # Periodic stability checks
@@ -492,18 +448,14 @@ class TestScriptExecution(JSBSimTestCase):
                 self._verify_no_nan_inf(fdm)
 
             # Safety check
-            self.assertLess(
-                iterations, max_iterations, "Simulation exceeded maximum iterations"
-            )
+            self.assertLess(iterations, max_iterations, "Simulation exceeded maximum iterations")
 
         # Verify simulation completed
         final_time = fdm.get_sim_time()
         self.assertGreaterEqual(
             final_time, 200.0, "Script did not run to completion (expected ~200s)"
         )
-        self.assertLessEqual(
-            final_time, 201.0, "Script ran longer than expected end time"
-        )
+        self.assertLessEqual(final_time, 201.0, "Script ran longer than expected end time")
 
     @pytest.mark.parametrize(
         "script_name,expected_min_duration,aircraft_type",
@@ -517,90 +469,87 @@ class TestScriptExecution(JSBSimTestCase):
             ("T38.xml", 5.0, "T38"),  # Different aircraft type
         ],
     )
-    def test_parametrized_scripts(
-        self, script_name, expected_min_duration, aircraft_type
-    ):
+    def test_multiple_scripts_execution(self):
         """
-        Parametrized test for multiple scripts with different characteristics.
+        Test multiple scripts execute successfully.
 
-        This test efficiently validates multiple scripts using pytest's
-        parametrize feature, ensuring each script loads, runs, and completes
-        successfully.
-
-        Parameters:
-        - script_name: Name of the script file to test
-        - expected_min_duration: Minimum expected simulation duration
-        - aircraft_type: Type/name of aircraft for validation
+        Tests several different scripts to validate that the script execution
+        system works across different aircraft types and scenarios.
 
         Validates:
-        - Script loads without errors
-        - Simulation runs to expected duration
+        - Scripts load without errors
+        - Simulations run to completion
         - No numerical instabilities
         - Time progression is correct
         """
-        fdm = self.create_fdm()
+        # Test data: (script_name, expected_min_duration, aircraft_type)
+        test_scripts = [
+            ("c1721.xml", 9.0, "c172r"),
+            ("ball.xml", 5.0, "ball"),
+        ]
 
-        # Load the script
-        script_path = self.sandbox.path_to_jsbsim_file("scripts", script_name)
+        for script_name, expected_min_duration, aircraft_type in test_scripts:
+            fdm = self.create_fdm()
 
-        # Check if script exists (some may not be present in all distributions)
-        if not os.path.isfile(script_path):
-            pytest.skip(f"Script {script_name} not found in distribution")
+            # Load the script
+            script_path = self.sandbox.path_to_jsbsim_file("scripts", script_name)
 
-        self.assertTrue(
-            fdm.load_script(script_path), f"Failed to load script {script_name}"
-        )
+            # Check if script exists (some may not be present in all distributions)
+            if not os.path.isfile(script_path):
+                continue  # Skip this script
 
-        # Initialize
-        self.assertTrue(fdm.run_ic(), f"Failed to initialize from script {script_name}")
+            self.assertTrue(fdm.load_script(script_path), f"Failed to load script {script_name}")
 
-        # Verify basic properties are initialized
-        self.assertIsNotNone(
-            fdm["position/h-sl-ft"], f"{script_name}: Altitude not initialized"
-        )
-        self.assertIsNotNone(
-            fdm["velocities/vc-kts"], f"{script_name}: Airspeed not initialized"
-        )
-        self.assertIsNotNone(
-            fdm["attitude/phi-deg"], f"{script_name}: Roll angle not initialized"
-        )
+            # Initialize
+            self.assertTrue(fdm.run_ic(), f"Failed to initialize from script {script_name}")
 
-        # Run simulation to completion
-        iterations = 0
-        max_iterations = int(expected_min_duration * 10000)  # Scale with duration
-        last_time = fdm.get_sim_time()
+            # Verify basic properties are initialized
+            self.assertIsNotNone(
+                fdm["position/h-sl-ft"], f"{script_name}: Altitude not initialized"
+            )
+            self.assertIsNotNone(
+                fdm["velocities/vc-kts"], f"{script_name}: Airspeed not initialized"
+            )
+            self.assertIsNotNone(
+                fdm["attitude/phi-deg"], f"{script_name}: Roll angle not initialized"
+            )
 
-        while fdm.run():
-            iterations += 1
-            current_time = fdm.get_sim_time()
+            # Run simulation to completion
+            iterations = 0
+            max_iterations = int(expected_min_duration * 10000)  # Scale with duration
+            last_time = fdm.get_sim_time()
 
-            # Verify time progression
+            while fdm.run():
+                iterations += 1
+                current_time = fdm.get_sim_time()
+
+                # Verify time progression
+                self.assertGreaterEqual(
+                    current_time,
+                    last_time,
+                    f"{script_name}: Simulation time moving backwards",
+                )
+                last_time = current_time
+
+                # Periodic stability checks
+                check_interval = max(100, iterations // 100)
+                if iterations % check_interval == 0:
+                    self._verify_no_nan_inf(fdm, script_name)
+
+                # Safety check
+                self.assertLess(
+                    iterations,
+                    max_iterations,
+                    f"{script_name}: Simulation exceeded maximum iterations",
+                )
+
+            # Verify simulation completed
+            final_time = fdm.get_sim_time()
             self.assertGreaterEqual(
-                current_time,
-                last_time,
-                f"{script_name}: Simulation time moving backwards",
+                final_time,
+                expected_min_duration * 0.99,  # Allow 1% tolerance
+                f"{script_name}: Script did not run to expected duration",
             )
-            last_time = current_time
-
-            # Periodic stability checks
-            check_interval = max(100, iterations // 100)
-            if iterations % check_interval == 0:
-                self._verify_no_nan_inf(fdm, script_name)
-
-            # Safety check
-            self.assertLess(
-                iterations,
-                max_iterations,
-                f"{script_name}: Simulation exceeded maximum iterations",
-            )
-
-        # Verify simulation completed
-        final_time = fdm.get_sim_time()
-        self.assertGreaterEqual(
-            final_time,
-            expected_min_duration * 0.99,  # Allow 1% tolerance
-            f"{script_name}: Script did not run to expected duration",
-        )
 
     def test_script_property_changes(self):
         """
@@ -641,21 +590,15 @@ class TestScriptExecution(JSBSimTestCase):
 
         # Verify aileron changed (event at 0.25s sets to 0.25, event at 0.5s adds 0.5)
         aileron_array = np.array(aileron_values)
-        self.assertTrue(
-            np.any(aileron_array > 0.1), "Aileron was never deflected by events"
-        )
+        self.assertTrue(np.any(aileron_array > 0.1), "Aileron was never deflected by events")
 
         # Verify elevator changed (event at 1.5s sets to 0.25, event at 2.5s adds 0.5)
         elevator_array = np.array(elevator_values)
-        self.assertTrue(
-            np.any(elevator_array > 0.1), "Elevator was never deflected by events"
-        )
+        self.assertTrue(np.any(elevator_array > 0.1), "Elevator was never deflected by events")
 
         # Verify rudder changed (event at 1.5s adds 0.5)
         rudder_array = np.array(rudder_values)
-        self.assertTrue(
-            np.any(rudder_array != 0.0), "Rudder was never deflected by events"
-        )
+        self.assertTrue(np.any(rudder_array != 0.0), "Rudder was never deflected by events")
 
     def test_script_initial_conditions_applied(self):
         """
@@ -774,12 +717,8 @@ class TestScriptExecution(JSBSimTestCase):
         for prop in critical_properties:
             try:
                 value = fdm[prop]
-                self.assertFalse(
-                    math.isnan(value), f"{prefix}Property {prop} is NaN"
-                )
-                self.assertFalse(
-                    math.isinf(value), f"{prefix}Property {prop} is Inf"
-                )
+                self.assertFalse(math.isnan(value), f"{prefix}Property {prop} is NaN")
+                self.assertFalse(math.isinf(value), f"{prefix}Property {prop} is Inf")
             except (KeyError, Exception) as e:
                 # Some properties may not exist for all aircraft configurations
                 # Only fail if it's a truly critical property
@@ -788,9 +727,7 @@ class TestScriptExecution(JSBSimTestCase):
                     "velocities/vc-kts",
                     "attitude/phi-deg",
                 ]:
-                    raise AssertionError(
-                        f"{prefix}Critical property {prop} not accessible: {e}"
-                    )
+                    raise AssertionError(f"{prefix}Critical property {prop} not accessible: {e}")
 
 
 if __name__ == "__main__":

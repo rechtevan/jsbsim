@@ -104,7 +104,10 @@ class TestAircraftSpecificScenarios(JSBSimTestCase):
         rotation_speed = False
         for _ in range(500):
             fdm.run()
-            if fdm["velocities/vg-kts"] > 55.0:  # Vr for C172
+            # Convert vg-fps to knots: fps * 0.592484 = kts
+            vg_fps = fdm["velocities/vg-fps"]
+            vg_kts = vg_fps * 0.592484
+            if vg_kts > 55.0:  # Vr for C172
                 rotation_speed = True
                 break
 
@@ -169,8 +172,12 @@ class TestAircraftSpecificScenarios(JSBSimTestCase):
         takeoff_distance = 0.0
         start_position = fdm["position/distance-from-start-mag-mt"]
 
-        while fdm["velocities/vg-kts"] < 60.0 and fdm["simulation/sim-time-sec"] < 60.0:
+        while fdm["simulation/sim-time-sec"] < 60.0:
             fdm.run()
+            # Convert vg-fps to knots
+            vg_kts = fdm["velocities/vg-fps"] * 0.592484
+            if vg_kts >= 60.0:
+                break
 
         # Rotate at Vx (best angle) ~60 kts for C172
         fdm["fcs/elevator-cmd-norm"] = -0.2
