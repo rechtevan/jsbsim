@@ -203,6 +203,20 @@ repos:
         # MD041: First line not h1
 
   # =============================================================================
+  # Code Coverage (Manual - Run with: pre-commit run cpp-coverage-check)
+  # =============================================================================
+  - repo: local
+    hooks:
+      - id: cpp-coverage-check
+        name: Check C++ code coverage (manual)
+        entry: scripts/check-cpp-coverage.sh
+        language: system
+        pass_filenames: false
+        stages: [manual]
+        always_run: true
+        verbose: true
+
+  # =============================================================================
   # Security Checks
   # =============================================================================
   # Temporarily commented out - needs baseline file generation first

@@ -64,7 +64,17 @@ pre-commit run black --all-files
 
 # Skip hooks for a commit (use sparingly)
 git commit --no-verify -m "message"
+
+# Run manual C++ coverage check
+pre-commit run cpp-coverage-check --hook-stage manual
 ```
+
+**Note:** C++ coverage check is configured as a **manual hook** because it:
+- Takes 5-15 minutes to run (rebuild + test + report generation)
+- Would slow down every commit excessively
+- Already runs automatically in CI/CD on every PR/push
+- Available on-demand when developers want to check locally
+
 
 ### Coverage Tracking
 
