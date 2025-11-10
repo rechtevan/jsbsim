@@ -18,19 +18,23 @@
 # You should have received a copy of the GNU General Public License along with
 # this program; if not, see <http://www.gnu.org/licenses/>
 #
-from JSBSim_utils import JSBSimTestCase, RunTest, ExecuteUntil
+from JSBSim_utils import ExecuteUntil, JSBSimTestCase, RunTest
 
-import fpectl
+try:
+    import fpectl
+except ImportError:
+    # fpectl is not available in Python 3.12+
+    fpectl = None
 
 
 class TestLighterThanAir(JSBSimTestCase):
     def testValve(self):
+        if fpectl is None:
+            self.skipTest("fpectl module not available (Python 3.12+)")
         fpectl.turnon_sigfpe()
 
         fdm = self.create_fdm()
-        fdm.load_script(
-            self.sandbox.path_to_jsbsim_file("scripts", "weather-balloon.xml")
-        )
+        fdm.load_script(self.sandbox.path_to_jsbsim_file("scripts", "weather-balloon.xml"))
 
         fdm.run_ic()
         fdm["buoyant_forces/gas-cell/burst"] = 1.0

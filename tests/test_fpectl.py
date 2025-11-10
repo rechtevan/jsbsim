@@ -18,17 +18,26 @@
 # this program; if not, see <http://www.gnu.org/licenses/>
 #
 
-import os, sys
+import os
+import sys
 
 sys.path.append(os.getcwd())
 
-import fpectl
-import unittest
-from JSBSim_utils import RunTest
+try:
+    import fpectl
+except ImportError:
+    # fpectl is not available in Python 3.12+
+    fpectl = None
+
+import unittest  # noqa: E402
+
+from JSBSim_utils import RunTest  # noqa: E402
 
 
 class check_fpectl(unittest.TestCase):
     def testModule(self):
+        if fpectl is None:
+            self.skipTest("fpectl module not available (Python 3.12+)")
         # Check that FP exceptions are not caught by default
         fpectl.test_sigfpe()
 
@@ -37,5 +46,6 @@ class check_fpectl(unittest.TestCase):
         with self.assertRaises(FloatingPointError):
             fpectl.turnon_sigfpe()
             fpectl.test_sigfpe()
+
 
 RunTest(check_fpectl)

@@ -18,31 +18,40 @@
 # You should have received a copy of the GNU General Public License along with
 # this program; if not, see <http://www.gnu.org/licenses/>
 #
-from JSBSim_utils import JSBSimTestCase, RunTest, ExecuteUntil
+from JSBSim_utils import ExecuteUntil, JSBSimTestCase, RunTest
 
-import fpectl
+try:
+    import fpectl
+except ImportError:
+    # fpectl is not available in Python 3.12+
+    fpectl = None
+
 import xml.etree.ElementTree as et
+
 import pandas as pd
 
 
 class CheckScripts(JSBSimTestCase):
     def testScripts(self):
+        if fpectl is None:
+            self.skipTest("fpectl module not available (Python 3.12+)")
         fpectl.turnon_sigfpe()
 
-        for s in self.script_list(['737_cruise_steady_turn_simplex.xml']):
+        for s in self.script_list(["737_cruise_steady_turn_simplex.xml"]):
             fdm = self.create_fdm()
             try:
-                self.assertTrue(fdm.load_script(s),
-                                msg="Failed to load script %s" % (s,))
+                self.assertTrue(fdm.load_script(s), msg="Failed to load script %s" % (s,))
 
                 fdm.run_ic()
-                ExecuteUntil(fdm, 30.)
+                ExecuteUntil(fdm, 30.0)
 
             except Exception as e:
-                fpectl.turnoff_sigfpe()
+                if fpectl is not None:
+                    fpectl.turnoff_sigfpe()
                 self.fail("Script %s failed:\n%s" % (s, e.args[0]))
 
-        fpectl.turnoff_sigfpe()
+        if fpectl is not None:
+            fpectl.turnoff_sigfpe()
 
     def testScriptEndTime(self):
         # Regression test: using a time step different than 120Hz in a script
@@ -50,23 +59,23 @@ class CheckScripts(JSBSimTestCase):
         # reproduced in this test.
         # Here, we are checking that the last step logged in the CSV file
         # corresponds to the end time specified in the script.
-        script_name = 'c1722.xml'
-        script_path = self.sandbox.path_to_jsbsim_file('scripts', script_name)
+        script_name = "c1722.xml"
+        script_path = self.sandbox.path_to_jsbsim_file("scripts", script_name)
         tree = et.parse(script_path)
-        run_tag = tree.getroot().find('./run')
-        run_tag.attrib['dt'] = '0.001'
-        end_time = float(run_tag.attrib['end'])
+        run_tag = tree.getroot().find("./run")
+        run_tag.attrib["dt"] = "0.001"
+        end_time = float(run_tag.attrib["end"])
         tree.write(script_name)
 
         fdm = self.create_fdm()
         fdm.load_script(script_name)
-        fdm['simulation/output/log_rate_hz'] = 200
+        fdm["simulation/output/log_rate_hz"] = 200
         fdm.run_ic()
 
         while fdm.run():
             pass
 
-        out = pd.read_csv('JSBout172B.csv', index_col=0)
+        out = pd.read_csv("JSBout172B.csv", index_col=0)
         self.assertAlmostEqual(out.index[-1], end_time)
 
 
