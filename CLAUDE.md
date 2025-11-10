@@ -358,3 +358,83 @@ while fdm.run():
 **CMake can't find Cython/Python**: Install Python 3 development headers and Cython (`pip install cython`).
 
 **Linking errors on Windows**: Use `-DBUILD_SHARED_LIBS=ON` to avoid symbol conflicts, or ensure proper static library configuration.
+
+## Code Documentation Standards
+
+JSBSim uses language-appropriate documentation formats to ensure maintainability and ease of use.
+
+### C++ Documentation (Doxygen)
+
+**Tool**: [Doxygen](http://www.doxygen.nl/) - generates HTML/PDF documentation from C++ comments
+**Build**: `make doc` (from build directory)
+**Output**: `build/documentation/html/`
+**Online**: <https://jsbsim-team.github.io/jsbsim/>
+
+**Documentation Requirements**:
+- All public classes must have Doxygen comments (`/** ... */`)
+- All public methods must be documented with:
+  - Brief description
+  - `@param` tags for each parameter (include units when applicable)
+  - `@return` tag for non-void functions (include units when applicable)
+  - Example usage for complex APIs
+- File-level documentation for all header files
+- Struct/enum members should be documented
+
+**Example**:
+```cpp
+/**
+ * Sets the aircraft altitude above sea level.
+ *
+ * @param altitude_ft Altitude in feet MSL (Mean Sea Level)
+ * @return true if altitude was set successfully, false otherwise
+ */
+bool SetAltitude(double altitude_ft);
+```
+
+**Current Status**: ~70% coverage (see `.local/DOXYGEN_ASSESSMENT_INDEX.md` for details)
+**Goal**: 85%+ coverage
+**Priority Areas**: FGPropertyManager, FGModel, FGEngine subsystems
+
+### Python Documentation (Docstrings)
+
+**Style**: [Google-style docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+**Tools**: Built-in help(), Sphinx (future)
+
+**Documentation Requirements**:
+- Module-level docstring for all Python files
+- Class docstrings describing purpose and usage
+- Method/function docstrings with:
+  - Brief description
+  - `Args:` section for parameters
+  - `Returns:` section for return values
+  - `Raises:` section for exceptions (if applicable)
+
+**Example**:
+```python
+def TrimAircraft(fdm, throttle_guess=0.6, use_throttle=True):
+    """
+    Trim aircraft for level flight at current altitude and airspeed.
+
+    Args:
+        fdm: FGFDMExec instance
+        throttle_guess: Initial throttle setting before trim (0.0-1.0)
+        use_throttle: If True, allows trim to adjust throttle
+
+    Returns:
+        bool: True if trim successful, False otherwise
+    """
+```
+
+**Current Status**: ~40-50% coverage (excellent for integration tests, gaps in utilities)
+**Goal**: 80%+ coverage
+**Priority Areas**: JSBSim_utils.py core classes (SandBox, JSBSimTestCase, CreateFDM)
+
+### Commit Requirements
+
+When submitting code changes:
+1. Document all new public APIs (C++ or Python)
+2. Update existing documentation if behavior changes
+3. Include examples for complex functionality
+4. Specify units for all physical quantities (ft, m, deg, rad, lbs, kg, etc.)
+
+**Note**: See `.local/DOXYGEN_ASSESSMENT_INDEX.md` and `.local/docstring_summary.txt` for detailed documentation assessment reports.

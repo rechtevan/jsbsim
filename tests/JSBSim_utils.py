@@ -30,7 +30,7 @@ import pandas as pd
 
 sys.path.append(os.getcwd())
 
-import jsbsim
+import jsbsim  # noqa: E402
 
 # Hides startup and debug messages
 jsbsim.FGJSBBase().debug_lvl = 0
@@ -76,6 +76,201 @@ def ExecuteUntil(_fdm, end_time):
     while _fdm.run():
         if _fdm.get_sim_time() > end_time:
             return
+
+
+def TrimAircraft(fdm, throttle_guess=0.6, use_throttle=True):
+    """
+    Trim aircraft for level flight at current altitude and airspeed.
+
+    Args:
+        fdm: FGFDMExec instance
+        throttle_guess: Initial throttle setting before trim (0.0-1.0)
+        use_throttle: If True, allows trim to adjust throttle
+
+    Returns:
+        bool: True if trim successful, False otherwise
+    """
+    from jsbsim import TrimFailureError
+
+    # Set initial throttle
+    fdm["fcs/throttle-cmd-norm"] = throttle_guess
+
+    # Run a few frames to stabilize
+    for _ in range(10):
+        fdm.run()
+
+    # Attempt trim
+    try:
+        fdm["simulation/do_simple_trim"] = 1
+        trim_completed = fdm["simulation/trim-completed"] == 1
+        return trim_completed
+    except TrimFailureError:
+        # Trim failed - try running a bit longer and retry once
+        for _ in range(20):
+            fdm.run()
+        try:
+            fdm["simulation/do_simple_trim"] = 1
+            return fdm["simulation/trim-completed"] == 1
+        except TrimFailureError:
+            return False
+
+
+class SimplePIDController:
+    """Simple PID controller for autopilot functions."""
+
+    def __init__(self, kp, ki, kd, output_min, output_max):
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.output_min = output_min
+        self.output_max = output_max
+        self.integral = 0.0
+        self.last_error = 0.0
+        self.last_time = None
+
+    def update(self, error, current_time):
+        """
+        Update PID controller with current error.
+
+        Args:
+            error: Current error (setpoint - measurement)
+            current_time: Current simulation time
+
+        Returns:
+            float: Control output (clamped to min/max)
+        """
+        if self.last_time is None:
+            self.last_time = current_time
+            self.last_error = error
+            return 0.0
+
+        dt = current_time - self.last_time
+        if dt <= 0.0:
+            return 0.0
+
+        # Proportional term
+        p_term = self.kp * error
+
+        # Integral term with anti-windup
+        self.integral += error * dt
+        i_term = self.ki * self.integral
+
+        # Derivative term
+        d_term = self.kd * (error - self.last_error) / dt
+
+        # Calculate output
+        output = p_term + i_term + d_term
+
+        # Clamp output
+        output = max(self.output_min, min(self.output_max, output))
+
+        # Anti-windup: reset integral if output is saturated
+        if output == self.output_max or output == self.output_min:
+            self.integral = 0.0
+
+        self.last_error = error
+        self.last_time = current_time
+
+        return output
+
+    def reset(self):
+        """Reset controller state."""
+        self.integral = 0.0
+        self.last_error = 0.0
+        self.last_time = None
+
+
+def AltitudeHoldController(fdm, target_altitude_ft, pid_controller=None):
+    """
+    Simple altitude hold autopilot using elevator control.
+
+    Args:
+        fdm: FGFDMExec instance
+        target_altitude_ft: Desired altitude in feet MSL
+        pid_controller: SimplePIDController instance (created if None)
+
+    Returns:
+        float: Elevator command (-1.0 to 1.0)
+    """
+    if pid_controller is None:
+        # Create default altitude hold controller
+        # kp, ki, kd tuned for C172-like aircraft
+        pid_controller = SimplePIDController(
+            kp=0.001,  # Proportional gain
+            ki=0.0001,  # Integral gain
+            kd=0.002,  # Derivative gain
+            output_min=-0.3,
+            output_max=0.1,
+        )
+
+    current_altitude = fdm["position/h-sl-ft"]
+    error = target_altitude_ft - current_altitude
+    current_time = fdm.get_sim_time()
+
+    elevator_cmd = pid_controller.update(error, current_time)
+    return elevator_cmd
+
+
+def HeadingHoldController(fdm, target_heading_deg, pid_controller=None):
+    """
+    Simple heading hold autopilot using aileron and rudder.
+
+    Args:
+        fdm: FGFDMExec instance
+        target_heading_deg: Desired heading in degrees (0-360)
+        pid_controller: SimplePIDController instance (created if None)
+
+    Returns:
+        tuple: (aileron_cmd, rudder_cmd) each -1.0 to 1.0
+    """
+    if pid_controller is None:
+        # Create default heading hold controller
+        pid_controller = SimplePIDController(
+            kp=0.01, ki=0.001, kd=0.005, output_min=-0.3, output_max=0.3
+        )
+
+    current_heading = fdm["attitude/psi-deg"]
+
+    # Calculate shortest heading error (handling wrap-around)
+    error = target_heading_deg - current_heading
+    if error > 180.0:
+        error -= 360.0
+    elif error < -180.0:
+        error += 360.0
+
+    current_time = fdm.get_sim_time()
+    aileron_cmd = pid_controller.update(error, current_time)
+
+    # Coordinated rudder (simple coordination)
+    rudder_cmd = aileron_cmd * 0.5
+
+    return aileron_cmd, rudder_cmd
+
+
+def SpeedHoldController(fdm, target_speed_kts, pid_controller=None):
+    """
+    Simple airspeed hold autopilot using throttle control.
+
+    Args:
+        fdm: FGFDMExec instance
+        target_speed_kts: Desired calibrated airspeed in knots
+        pid_controller: SimplePIDController instance (created if None)
+
+    Returns:
+        float: Throttle command (0.0 to 1.0)
+    """
+    if pid_controller is None:
+        # Create default speed hold controller
+        pid_controller = SimplePIDController(
+            kp=0.02, ki=0.005, kd=0.01, output_min=0.0, output_max=1.0
+        )
+
+    current_speed = fdm["velocities/vc-kts"]
+    error = target_speed_kts - current_speed
+    current_time = fdm.get_sim_time()
+
+    throttle_cmd = pid_controller.update(error, current_time)
+    return throttle_cmd
 
 
 def append_xml(name):
