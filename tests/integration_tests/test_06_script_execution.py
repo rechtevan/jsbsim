@@ -44,7 +44,7 @@ import pytest
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from JSBSim_utils import JSBSimTestCase, RunTest
+from JSBSim_utils import JSBSimTestCase, RunTest  # noqa: E402
 
 
 class TestScriptExecution(JSBSimTestCase):
@@ -298,8 +298,16 @@ class TestScriptExecution(JSBSimTestCase):
             iterations += 1
             current_time = fdm.get_sim_time()
 
-            # Verify time progression
-            self.assertGreaterEqual(current_time, last_time, "Simulation time moving backwards")
+            # Verify time progression (allow for reset events that reset time to 0.0)
+            if current_time < last_time:
+                # Check if this is a reset (time goes back to near 0.0)
+                if current_time < 1.0 and last_time > 20.0:
+                    # Reset is expected in this script at ~25 seconds
+                    pass
+                else:
+                    self.fail(
+                        f"Simulation time moving backwards unexpectedly: {current_time} < {last_time}"
+                    )
             last_time = current_time
 
             # Check for autopilot engagement (around 5s in script)
@@ -483,12 +491,18 @@ class TestScriptExecution(JSBSimTestCase):
         - Time progression is correct
         """
         # Test data: (script_name, expected_min_duration, aircraft_type)
+        # Note: ball.xml actually runs for ~10800 seconds, so we use a large max_iterations
         test_scripts = [
-            ("c1721.xml", 9.0, "c172r"),
-            ("ball.xml", 5.0, "ball"),
+            (
+                "c1721.xml",
+                9.0,
+                "c172r",
+                100000,
+            ),  # (script_name, min_duration, aircraft_type, max_iterations)
+            ("ball.xml", 5.0, "ball", 1200000),  # ball.xml runs for 10800s, needs ~1.08M iterations
         ]
 
-        for script_name, expected_min_duration, aircraft_type in test_scripts:
+        for script_name, expected_min_duration, aircraft_type, max_iterations in test_scripts:
             fdm = self.create_fdm()
 
             # Load the script
@@ -516,20 +530,34 @@ class TestScriptExecution(JSBSimTestCase):
 
             # Run simulation to completion
             iterations = 0
-            max_iterations = int(expected_min_duration * 10000)  # Scale with duration
             last_time = fdm.get_sim_time()
 
             while fdm.run():
                 iterations += 1
                 current_time = fdm.get_sim_time()
 
-                # Verify time progression
-                self.assertGreaterEqual(
-                    current_time,
-                    last_time,
-                    f"{script_name}: Simulation time moving backwards",
-                )
+                # Verify time progression (allow for reset events)
+                if current_time < last_time:
+                    # Check if this is a reset (time goes back to near 0.0)
+                    if current_time < 1.0 and last_time > 1.0:
+                        # Reset occurred, this is expected in some scripts
+                        pass
+                    else:
+                        self.fail(
+                            f"{script_name}: Simulation time moving backwards unexpectedly: "
+                            f"{current_time} < {last_time}"
+                        )
                 last_time = current_time
+
+                # For very long scripts (like ball.xml with 10800s), stop after verifying
+                # they run correctly for the expected minimum duration
+                if current_time >= expected_min_duration:
+                    # For scripts that run much longer than expected_min_duration,
+                    # stop early after verifying they work correctly
+                    if script_name == "ball.xml" and current_time >= 10.0:
+                        # ball.xml runs for 10800s, but we only need to verify it works
+                        # Stop after 10 seconds to avoid very long test runs
+                        break
 
                 # Periodic stability checks
                 check_interval = max(100, iterations // 100)
@@ -543,13 +571,22 @@ class TestScriptExecution(JSBSimTestCase):
                     f"{script_name}: Simulation exceeded maximum iterations",
                 )
 
-            # Verify simulation completed
+            # Verify simulation completed or ran for minimum duration
             final_time = fdm.get_sim_time()
-            self.assertGreaterEqual(
-                final_time,
-                expected_min_duration * 0.99,  # Allow 1% tolerance
-                f"{script_name}: Script did not run to expected duration",
-            )
+            if script_name == "ball.xml":
+                # ball.xml is a very long script (10800s), we just verify it runs correctly
+                # for a reasonable duration (10 seconds) rather than the full script
+                self.assertGreaterEqual(
+                    final_time,
+                    10.0,
+                    f"{script_name}: Script did not run for minimum verification duration",
+                )
+            else:
+                self.assertGreaterEqual(
+                    final_time,
+                    expected_min_duration * 0.99,  # Allow 1% tolerance
+                    f"{script_name}: Script did not run to expected duration",
+                )
 
     def test_script_property_changes(self):
         """

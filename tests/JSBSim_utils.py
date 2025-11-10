@@ -296,6 +296,15 @@ def CheckXMLFile(f, header):
 
 def CopyAircraftDef(script_path, sandbox):
     # Get the aircraft name
+    # Convert relative path to absolute if needed
+    # path_to_jsbsim_file returns a path relative to sandbox temp directory
+    if not os.path.isabs(script_path):
+        # Resolve relative path from sandbox temp directory
+        script_path_abs = os.path.abspath(os.path.join(sandbox._tmpdir, script_path))
+        # If that doesn't exist, try resolving from current directory
+        if not os.path.exists(script_path_abs):
+            script_path_abs = os.path.abspath(script_path)
+        script_path = script_path_abs
     tree = et.parse(script_path)
     use_element = tree.getroot().find("use")
     aircraft_name = use_element.attrib["aircraft"]
@@ -303,6 +312,11 @@ def CopyAircraftDef(script_path, sandbox):
     # Then, create a directory aircraft/aircraft_name in the build directory
     aircraft_path = os.path.join("aircraft", aircraft_name)
     path_to_jsbsim_aircrafts = sandbox.path_to_jsbsim_file(aircraft_path)
+    # Resolve relative path to absolute (relative to sandbox temp directory)
+    if not os.path.isabs(path_to_jsbsim_aircrafts):
+        path_to_jsbsim_aircrafts = os.path.abspath(
+            os.path.join(sandbox._tmpdir, path_to_jsbsim_aircrafts)
+        )
     aircraft_path = sandbox(aircraft_path)
     if not os.path.exists(aircraft_path):
         os.makedirs(aircraft_path)
