@@ -701,7 +701,7 @@ class TestRunTestUtility(unittest.TestCase):
             sys.exit = original_exit
 
     def test_run_test_with_failing_tests(self):
-        """Test RunTest with failing tests calls sys.exit."""
+        """Test RunTest with failing tests calls sys.exit when not under pytest."""
         from JSBSim_utils import RunTest
 
         # Create a failing test class
@@ -709,10 +709,11 @@ class TestRunTestUtility(unittest.TestCase):
             def test_simple_fail(self):
                 self.assertTrue(False)  # This will fail
 
-        # Mock sys.exit
+        # Mock sys.exit and sys.modules
         import sys
 
         original_exit = sys.exit
+        original_modules = sys.modules.copy()
 
         exit_called = []
 
@@ -721,8 +722,11 @@ class TestRunTestUtility(unittest.TestCase):
 
         try:
             sys.exit = mock_exit
+            # Remove pytest from modules to simulate running outside pytest
+            if "pytest" in sys.modules:
+                del sys.modules["pytest"]
 
-            # Run the test - should call sys.exit(-1) for failures
+            # Run the test - should call sys.exit(-1) for failures when not under pytest
             RunTest(FailingTest)
 
             # Should have called sys.exit with -1
@@ -731,6 +735,8 @@ class TestRunTestUtility(unittest.TestCase):
 
         finally:
             sys.exit = original_exit
+            sys.modules.clear()
+            sys.modules.update(original_modules)
 
 
 if __name__ == "__main__":
