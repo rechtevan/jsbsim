@@ -31,6 +31,7 @@ from JSBSim_utils import (  # noqa: E402
     SandBox,
     SimplePIDController,
     SpeedHoldController,
+    TrimAircraft,
 )
 
 
@@ -451,6 +452,97 @@ class TestAltitudeHoldEdgeCases:
 
         # Should be within reasonable elevator limits
         assert -1.0 <= elevator_cmd <= 1.0
+
+
+class TestTrimAircraftRetry:
+    """Unit tests for TrimAircraft retry logic."""
+
+    def test_trim_retry_on_failure(self):
+        """Test TrimAircraft retries after initial failure."""
+        # Import TrimFailureError from jsbsim if available
+        try:
+            from jsbsim import TrimFailureError
+        except ImportError:
+            pytest.skip("jsbsim module not available for TrimFailureError")
+
+        class MockFDM:
+            def __init__(self):
+                self.props = {
+                    "fcs/throttle-cmd-norm": 0.0,
+                    "simulation/trim-completed": 0,
+                }
+                self.run_count = 0
+                self.trim_attempts = 0
+
+            def __setitem__(self, key, value):
+                self.props[key] = value
+                # Simulate trim behavior
+                if key == "simulation/do_simple_trim" and value == 1:
+                    self.trim_attempts += 1
+                    # First attempt fails, second succeeds
+                    if self.trim_attempts == 1:
+                        raise TrimFailureError("First trim failed")
+                    else:
+                        self.props["simulation/trim-completed"] = 1
+
+            def __getitem__(self, key):
+                return self.props.get(key, 0.0)
+
+            def run(self):
+                self.run_count += 1
+                return True
+
+        fdm = MockFDM()
+
+        # Call TrimAircraft - should handle failure and retry
+        result = TrimAircraft(fdm, throttle_guess=0.6)
+
+        # Verify trim succeeded after retry
+        assert result is True
+
+        # Verify two trim attempts were made
+        assert fdm.trim_attempts == 2
+
+        # Verify additional run() calls between attempts (should be 20)
+        # Initial: 10 runs, after first failure: 20 runs
+        # Total should be 30+ runs
+        assert fdm.run_count >= 30
+
+    def test_trim_fails_after_retry(self):
+        """Test TrimAircraft returns False when both attempts fail."""
+        try:
+            from jsbsim import TrimFailureError
+        except ImportError:
+            pytest.skip("jsbsim module not available for TrimFailureError")
+
+        class MockFDM:
+            def __init__(self):
+                self.props = {"fcs/throttle-cmd-norm": 0.0}
+                self.trim_attempts = 0
+
+            def __setitem__(self, key, value):
+                self.props[key] = value
+                if key == "simulation/do_simple_trim" and value == 1:
+                    self.trim_attempts += 1
+                    # Both attempts fail
+                    raise TrimFailureError("Trim failed")
+
+            def __getitem__(self, key):
+                return self.props.get(key, 0.0)
+
+            def run(self):
+                return True
+
+        fdm = MockFDM()
+
+        # Call TrimAircraft - should fail both times
+        result = TrimAircraft(fdm, throttle_guess=0.6)
+
+        # Verify trim failed
+        assert result is False
+
+        # Verify two attempts were made
+        assert fdm.trim_attempts == 2
 
 
 if __name__ == "__main__":
