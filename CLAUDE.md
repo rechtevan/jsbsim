@@ -8,6 +8,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Purpose**: Code examination, bug fixes, minor enhancements, security improvements, and test code development
 **GitHub Issues**: Create issues in rechtevan's repository, not upstream
 
+### GitHub CLI Configuration
+
+**IMPORTANT**: When working with a forked repository, ensure GitHub CLI (`gh`) is configured to use your fork, not upstream.
+
+**Check current default**:
+```bash
+gh repo view
+```
+
+This should show: `name: rechtevan/jsbsim`
+
+**If it shows JSBSim-Team/jsbsim**, set the correct default:
+```bash
+# From within the repository directory
+gh repo set-default rechtevan/jsbsim
+```
+
+**Verify remotes**:
+```bash
+git remote -v
+# Should show:
+# origin  git@github.com:rechtevan/jsbsim.git (fetch)
+# origin  git@github.com:rechtevan/jsbsim.git (push)
+```
+
+**Why this matters**: Creating issues in upstream (JSBSim-Team) instead of your fork can cause confusion and is inappropriate for fork-specific development work.
+
 ## Local Development Conventions
 
 **`.local/` Directory**: Used for AI-generated analysis, scripts, reports, and other files that should NOT be committed to git. This directory is in `.gitignore`.
