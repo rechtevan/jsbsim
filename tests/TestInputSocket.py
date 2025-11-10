@@ -31,9 +31,7 @@ class TelnetInterface:
     writer = None
 
     async def run(self, port, shell):
-        self.reader, self.writer = await telnetlib3.open_connection(
-            "localhost", port, shell=shell
-        )
+        self.reader, self.writer = await telnetlib3.open_connection("localhost", port, shell=shell)
         await self.writer.protocol.waiter_closed
 
     async def get_output(self):
@@ -157,12 +155,8 @@ class TestInputSocket(JSBSimTestCase):
         )
 
         # Modify the tank[0] contents via the "send" command
-        half_contents = 0.5 * (
-            await self.telnet.get_property_value("propulsion/tank/contents-lbs")
-        )
-        await self.telnet.send_command(
-            "set propulsion/tank/contents-lbs " + str(half_contents)
-        )
+        half_contents = 0.5 * (await self.telnet.get_property_value("propulsion/tank/contents-lbs"))
+        await self.telnet.send_command("set propulsion/tank/contents-lbs " + str(half_contents))
         self.assertEqual(
             await self.telnet.get_property_value("propulsion/tank/contents-lbs"),
             half_contents,
@@ -206,13 +200,14 @@ class TestInputSocket(JSBSimTestCase):
 
         # Check that "help" returns the minimum set of commands that will be
         # tested
+        commands = sorted(
+            filter(
+                lambda x: x,  # Filter out empty strings
+                (line.split("{")[0].strip() for line in out.split("\n")[2:-1]),
+            )
+        )
         self.assertEqual(
-            sorted(
-                map(
-                    lambda x: x.split("{")[0].strip(),
-                    out.split("\n")[2:-1],
-                )
-            ),
+            commands,
             ["get", "help", "hold", "info", "iterate", "quit", "resume", "set"],
         )
 
@@ -246,4 +241,5 @@ class TestInputSocket(JSBSimTestCase):
         asyncio.run(self.run_test(1138, self.sanity_check))
 
 
-RunTest(TestInputSocket)
+if __name__ == "__main__":
+    RunTest(TestInputSocket)

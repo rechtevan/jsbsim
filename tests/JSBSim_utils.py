@@ -463,7 +463,8 @@ class FlightModel:
 def RunTest(test):
     suite = unittest.TestLoader().loadTestsFromTestCase(test)
     test_result = unittest.TextTestRunner(verbosity=2).run(suite)
-    if test_result.failures or test_result.errors:
+    # Only exit if not running under pytest (pytest handles test failures itself)
+    if (test_result.failures or test_result.errors) and "pytest" not in sys.modules:
         sys.exit(-1)  # 'make test' will report the test failed.
 
 
