@@ -45,6 +45,7 @@ from JSBSim_utils import (  # noqa: E402
     JSBSimTestCase,
     RunTest,
     SimplePIDController,
+    SpeedHoldController,
     TrimAircraft,
 )
 
@@ -339,6 +340,132 @@ class TestClimbDescent(JSBSimTestCase):
         # Just verify we didn't gain energy (physics violation) and lost some (drag)
         self.assertLess(energy_ratio, 1.1, "Energy shouldn't increase significantly")
         self.assertGreater(energy_ratio, 0.5, "Energy loss shouldn't be excessive")
+
+    def test_autopilot_speed_hold(self):
+        """
+        Test autopilot speed hold functionality using SpeedHoldController.
+
+        This test verifies that the SpeedHoldController autopilot function
+        can maintain a target airspeed by commanding appropriate throttle
+        inputs. This exercises the PID control logic and demonstrates
+        automated speed control during climb and level flight.
+
+        Physics verification:
+        - Throttle commands generated to achieve target speed
+        - Speed maintained within tolerance once achieved
+        - PID controller properly initialized and operated
+        - Engine responds to throttle commands
+        """
+        fdm = self.create_fdm()
+        self.assertTrue(fdm.load_model("c172p"), "Failed to load C172P aircraft model")
+
+        # Set initial conditions: low speed
+        fdm["ic/h-sl-ft"] = 3000.0
+        fdm["ic/vc-kts"] = 70.0  # Below target
+        fdm["ic/gamma-deg"] = 0.0
+        fdm["ic/psi-true-deg"] = 0.0
+        self.assertTrue(fdm.run_ic(), "Failed to initialize")
+
+        # Start engine
+        fdm["fcs/mixture-cmd-norm"] = 0.87
+        fdm["fcs/throttle-cmd-norm"] = 0.7
+        fdm["propulsion/magneto_cmd"] = 3
+        fdm["propulsion/starter_cmd"] = 1
+        dt = fdm["simulation/dt"]
+        for _ in range(int(2.5 / dt)):
+            fdm.run()
+        fdm["propulsion/starter_cmd"] = 0
+
+        # Trim for level flight at initial speed
+        TrimAircraft(fdm, throttle_guess=0.5)
+
+        initial_speed = fdm["velocities/vc-kts"]
+        target_speed = 95.0  # Target cruise speed
+
+        # Create speed controller
+        speed_pid = SimplePIDController(kp=0.02, ki=0.005, kd=0.01, output_min=0.0, output_max=1.0)
+
+        # Create altitude controller to maintain level flight
+        alt_controller = SimplePIDController(
+            kp=0.002, ki=0.0001, kd=0.003, output_min=-0.3, output_max=0.1
+        )
+
+        target_altitude = fdm["position/h-sl-ft"]
+
+        # Execute speed hold for 60 seconds
+        duration = 60.0
+        start_time = fdm.get_sim_time()
+
+        speed_errors = []
+        throttle_commands = []
+        speeds = []
+
+        while fdm.get_sim_time() - start_time < duration:
+            # Get autopilot throttle command
+            throttle_cmd = SpeedHoldController(
+                fdm, target_speed_kts=target_speed, pid_controller=speed_pid
+            )
+
+            # Apply autopilot throttle command
+            fdm["fcs/throttle-cmd-norm"] = throttle_cmd
+
+            # Maintain altitude with altitude hold
+            elevator_cmd = AltitudeHoldController(fdm, target_altitude, alt_controller)
+            fdm["fcs/elevator-cmd-norm"] = elevator_cmd
+
+            # Run simulation step
+            self.assertTrue(fdm.run(), f"Simulation failed at time {fdm.get_sim_time()}")
+
+            # Collect data after initial acceleration (last 40 seconds)
+            if fdm.get_sim_time() - start_time > 20.0:
+                current_speed = fdm["velocities/vc-kts"]
+                speed_error = abs(target_speed - current_speed)
+                speed_errors.append(speed_error)
+                throttle_commands.append(throttle_cmd)
+                speeds.append(current_speed)
+
+        # Verify speed achieved and maintained
+        if len(speed_errors) > 0:
+            avg_speed_error = sum(speed_errors) / len(speed_errors)
+
+            # Verify average speed error is small (speed is being held)
+            self.assertLess(
+                avg_speed_error,
+                20.0,  # Average within 20 knots (relaxed for realistic autopilot)
+                f"Average speed error {avg_speed_error:.1f} kts exceeds tolerance",
+            )
+
+            # Verify we achieved target speed at some point
+            min_speed_error = min(speed_errors)
+            self.assertLess(
+                min_speed_error,
+                15.0,  # Got within 15 knots at some point
+                f"Autopilot never achieved speed (min error {min_speed_error:.1f} kts)",
+            )
+
+        # Verify autopilot generated throttle commands (not stuck)
+        if len(throttle_commands) > 0:
+            throttle_range = max(throttle_commands) - min(throttle_commands)
+            self.assertGreater(
+                throttle_range,
+                0.05,
+                "Autopilot should adjust throttle to maintain speed",
+            )
+
+        # Verify speed increased from initial
+        if len(speeds) > 0:
+            final_speed = speeds[-1]
+            speed_increase = final_speed - initial_speed
+            self.assertGreater(
+                speed_increase,
+                5.0,  # At least 5 knots increase toward target
+                f"Speed increase {speed_increase:.1f} kts insufficient",
+            )
+
+        # Verify engine is running and producing thrust
+        thrust = fdm["propulsion/engine/thrust-lbs"]
+        self.assertGreater(thrust, 50.0, "Engine should be producing thrust")
+        self.assertEqual(fdm["propulsion/engine/set-running"], 1, "Engine should be running")
 
 
 if __name__ == "__main__":

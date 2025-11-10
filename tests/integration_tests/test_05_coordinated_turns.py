@@ -40,7 +40,12 @@ import sys
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from JSBSim_utils import JSBSimTestCase, RunTest  # noqa: E402
+from JSBSim_utils import (  # noqa: E402
+    HeadingHoldController,
+    JSBSimTestCase,
+    RunTest,
+    SimplePIDController,
+)
 
 
 class TestCoordinatedTurns(JSBSimTestCase):
@@ -660,6 +665,120 @@ class TestCoordinatedTurns(JSBSimTestCase):
             0.0,
             places=0,
             msg="Heading should change during coordinated turn",
+        )
+
+    def test_autopilot_heading_hold(self):
+        """
+        Test autopilot heading hold functionality using HeadingHoldController.
+
+        This test verifies that the HeadingHoldController autopilot function
+        can maintain a target heading by commanding appropriate aileron and
+        rudder inputs. This exercises the PID control logic and demonstrates
+        automated heading control.
+
+        Physics verification:
+        - Aircraft turns to achieve target heading
+        - Heading maintained within tolerance once achieved
+        - Coordinated aileron and rudder commands generated
+        - PID controller properly initialized and operated
+        """
+        fdm = self.create_fdm()
+        self.assertTrue(fdm.load_model("c172p"), "Failed to load C172P model")
+
+        # Initialize in cruise flight
+        self.assertTrue(self.initialize_cruise_flight(fdm), "Failed to initialize cruise flight")
+
+        initial_heading = fdm["attitude/psi-deg"]
+        target_heading = (initial_heading + 90.0) % 360.0  # Turn 90 degrees right
+
+        # Create PID controller for heading hold
+        heading_pid = SimplePIDController(
+            kp=0.01, ki=0.001, kd=0.005, output_min=-0.3, output_max=0.3
+        )
+
+        # Execute heading hold for 30 seconds
+        duration = 30.0
+        steps = int(duration / self.dt)
+
+        heading_errors = []
+        aileron_commands = []
+
+        for step in range(steps):
+            # Get autopilot commands
+            aileron_cmd, rudder_cmd = HeadingHoldController(
+                fdm, target_heading_deg=target_heading, pid_controller=heading_pid
+            )
+
+            # Apply autopilot commands
+            fdm["fcs/aileron-cmd-norm"] = aileron_cmd
+            fdm["fcs/rudder-cmd-norm"] = rudder_cmd
+
+            # Maintain altitude with simple proportional control
+            current_altitude = fdm["position/h-sl-ft"]
+            altitude_error = self.cruise_altitude - current_altitude
+            elevator_cmd = 0.02 * altitude_error / 100.0
+            elevator_cmd = max(-0.2, min(0.2, elevator_cmd))
+            fdm["fcs/elevator-cmd-norm"] = elevator_cmd
+
+            # Run simulation step
+            self.assertTrue(fdm.run(), f"Simulation failed at step {step}")
+
+            # Collect data after initial turn (last 10 seconds)
+            if step > int(20.0 / self.dt):
+                current_heading = fdm["attitude/psi-deg"]
+                heading_error = target_heading - current_heading
+
+                # Normalize heading error to [-180, 180]
+                if heading_error > 180.0:
+                    heading_error -= 360.0
+                elif heading_error < -180.0:
+                    heading_error += 360.0
+
+                heading_errors.append(abs(heading_error))
+                aileron_commands.append(aileron_cmd)
+
+        # Verify heading achieved and maintained
+        if len(heading_errors) > 0:
+            avg_heading_error = sum(heading_errors) / len(heading_errors)
+
+            # Verify average heading error is small (heading is being held)
+            self.assertLess(
+                avg_heading_error,
+                25.0,  # Average within 25 degrees (relaxed for realistic autopilot)
+                f"Average heading error {avg_heading_error:.1f} deg exceeds tolerance",
+            )
+
+            # Verify we got close to the target at some point
+            min_heading_error = min(heading_errors)
+            self.assertLess(
+                min_heading_error,
+                20.0,  # Got within 20 degrees at some point
+                f"Autopilot never achieved heading (min error {min_heading_error:.1f} deg)",
+            )
+
+        # Verify autopilot generated commands (not stuck at zero)
+        if len(aileron_commands) > 0:
+            max_aileron = max([abs(cmd) for cmd in aileron_commands])
+            self.assertGreater(
+                max_aileron,
+                0.01,
+                "Autopilot should generate non-zero aileron commands",
+            )
+
+        # Verify final heading is reasonably close to target
+        final_heading = fdm["attitude/psi-deg"]
+        final_heading_error = target_heading - final_heading
+
+        # Normalize to [-180, 180]
+        if final_heading_error > 180.0:
+            final_heading_error -= 360.0
+        elif final_heading_error < -180.0:
+            final_heading_error += 360.0
+
+        self.assertLess(
+            abs(final_heading_error),
+            40.0,  # Final heading within 40 degrees (relaxed for realistic autopilot)
+            f"Final heading error {final_heading_error:.1f} deg exceeds tolerance",
         )
 
 
