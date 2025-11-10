@@ -26,7 +26,9 @@ import pytest
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from JSBSim_utils import (  # noqa: E402
+    AltitudeHoldController,
     HeadingHoldController,
+    SandBox,
     SimplePIDController,
     SpeedHoldController,
 )
@@ -368,6 +370,87 @@ class TestSpeedHoldController:
         # Should clamp to max throttle
         assert throttle_cmd <= 1.0
         assert throttle_cmd >= 0.0
+
+
+class TestSandBox:
+    """Unit tests for SandBox utility class."""
+
+    def test_sandbox_call_method(self):
+        """Test SandBox.__call__() returns correct relative path."""
+        sandbox = SandBox()
+
+        try:
+            # Test __call__ method with file path
+            rel_path = sandbox("test_file.txt")
+
+            # Should return a relative path (not absolute)
+            assert not os.path.isabs(rel_path)
+
+            # Should contain the filename
+            assert "test_file.txt" in rel_path
+
+            # Test with subdirectory
+            rel_path_subdir = sandbox("subdir", "test_file.txt")
+            assert "subdir" in rel_path_subdir
+            assert "test_file.txt" in rel_path_subdir
+        finally:
+            sandbox.erase()
+
+    def test_sandbox_exists_method(self):
+        """Test SandBox.exists() uses __call__() correctly."""
+        sandbox = SandBox()
+
+        try:
+            # Create a test file in the sandbox
+            test_file = "test_exists.txt"
+            full_path = os.path.join(sandbox._tmpdir, test_file)
+
+            # File doesn't exist yet
+            assert not sandbox.exists(test_file)
+
+            # Create the file
+            with open(full_path, "w") as f:
+                f.write("test")
+
+            # Now it should exist
+            assert sandbox.exists(test_file)
+        finally:
+            sandbox.erase()
+
+
+class TestAltitudeHoldEdgeCases:
+    """Unit tests for AltitudeHoldController edge cases."""
+
+    def test_altitude_hold_default_pid(self):
+        """Test AltitudeHoldController creates default PID when None."""
+
+        class MockFDM:
+            def __init__(self):
+                self.props = {"position/h-sl-ft": 1000.0}
+                self.sim_time = 0.0
+
+            def __getitem__(self, key):
+                return self.props.get(key, 0.0)
+
+            def get_sim_time(self):
+                self.sim_time += 1.0
+                return self.sim_time
+
+        fdm = MockFDM()
+
+        # Call without PID controller (should create default)
+        # First call initializes
+        AltitudeHoldController(fdm, target_altitude_ft=2000.0, pid_controller=None)
+
+        # Second call should produce output
+        elevator_cmd = AltitudeHoldController(fdm, target_altitude_ft=2000.0, pid_controller=None)
+
+        # Should return a reasonable elevator command (not None, not NaN)
+        assert elevator_cmd is not None
+        assert not (elevator_cmd != elevator_cmd)  # Check for NaN
+
+        # Should be within reasonable elevator limits
+        assert -1.0 <= elevator_cmd <= 1.0
 
 
 if __name__ == "__main__":
