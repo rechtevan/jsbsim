@@ -1,0 +1,123 @@
+name: Python Test Coverage
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+    branches-ignore:
+      - 'dependabot/**'
+  pull_request:
+    branches:
+      - master
+      - develop
+
+jobs:
+  python-coverage:
+    name: Python Test Coverage
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout JSBSim
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov pytest-xdist
+          pip install numpy pandas
+
+      - name: Build JSBSim Python module
+        run: |
+          mkdir -p build
+          cd build
+          cmake -DBUILD_PYTHON_MODULE=ON -DBUILD_DOCS=OFF ..
+          make -j$(nproc)
+          cd ..
+
+      - name: Run Python tests with coverage
+        env:
+          PYTHONPATH: ${{ github.workspace }}/build/python
+        run: |
+          cd tests
+          python -m pytest \
+            --cov=tests \
+            --cov-report=xml:../coverage.xml \
+            --cov-report=html:../htmlcov \
+            --cov-report=term \
+            --cov-fail-under=80 \
+            -v \
+            -n auto
+        continue-on-error: false
+
+      - name: Upload coverage reports as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-coverage-report
+          path: |
+            coverage.xml
+            htmlcov/
+          retention-days: 30
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          file: ./coverage.xml
+          flags: python
+          name: python-coverage
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          echo "## Python Test Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f "coverage.xml" ]; then
+            python3 -c "
+          import xml.etree.ElementTree as ET
+          import sys
+
+          try:
+              tree = ET.parse('coverage.xml')
+              root = tree.getroot()
+
+              # Find coverage percentage
+              for package in root.findall('.//package'):
+                  line_rate = float(package.get('line-rate', 0))
+                  percentage = line_rate * 100
+                  print(f'**Coverage: {percentage:.2f}%**')
+                  print('')
+                  if percentage >= 80.0:
+                      print('✅ Coverage meets minimum threshold (80%)')
+                  else:
+                      print('❌ Coverage below minimum threshold (80%)')
+                  break
+              else:
+                  # Try alternative XML structure
+                  for coverage in root.findall('.//coverage'):
+                      line_rate = float(coverage.get('line-rate', 0))
+                      percentage = line_rate * 100
+                      print(f'**Coverage: {percentage:.2f}%**')
+                      print('')
+                      if percentage >= 80.0:
+                          print('✅ Coverage meets minimum threshold (80%)')
+                      else:
+                          print('❌ Coverage below minimum threshold (80%)')
+                      break
+          except Exception as e:
+              print(f'Could not parse coverage XML: {e}')
+              sys.exit(0)
+          " >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "View detailed report in artifacts." >> $GITHUB_STEP_SUMMARY

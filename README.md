@@ -1,4 +1,5 @@
 [![C/C++ build](https://github.com/JSBSim-Team/jsbsim/actions/workflows/cpp-python-build.yml/badge.svg)](https://github.com/JSBSim-Team/jsbsim/actions/workflows/cpp-python-build.yml)
+[![Python Coverage](https://codecov.io/gh/rechtevan/jsbsim/branch/master/graph/badge.svg?flag=python)](https://codecov.io/gh/rechtevan/jsbsim)
 [![PyPI](https://img.shields.io/pypi/v/jsbsim)](https://pypi.org/project/JSBSim)
 [![Conda (channel only)](https://img.shields.io/conda/vn/conda-forge/jsbsim)](https://anaconda.org/conda-forge/jsbsim)
 [![PyPI Downloads](https://static.pepy.tech/badge/jsbsim/week)](https://pepy.tech/projects/jsbsim)
