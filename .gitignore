@@ -38,6 +38,19 @@ initfile.*.xml
 ## Python
 #################
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Coverage files
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+
+# Test temporary directories
+tests/tmp*/
 
 #################
 ## Visual Studio
