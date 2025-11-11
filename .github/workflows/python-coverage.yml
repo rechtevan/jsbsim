@@ -48,6 +48,7 @@ jobs:
           cd ..
 
       - name: Run Python tests with coverage
+        timeout-minutes: 60
         env:
           PYTHONPATH: ${{ github.workspace }}/build/python
           LD_LIBRARY_PATH: ${{ github.workspace }}/build/src
