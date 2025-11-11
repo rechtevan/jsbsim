@@ -41,8 +41,10 @@ jobs:
         run: |
           mkdir -p build
           cd build
-          cmake -DBUILD_PYTHON_MODULE=ON -DBUILD_DOCS=OFF ..
+          cmake -DBUILD_PYTHON_MODULE=ON -DBUILD_DOCS=OFF -DBUILD_SHARED_LIBS=ON ..
           make -j$(nproc)
+          # Copy _jsbsim.so from tests/jsbsim to python/jsbsim (CMake builds it to tests directory)
+          cp tests/jsbsim/_jsbsim*.so python/jsbsim/ 2>/dev/null || true
           cd ..
 
       - name: Run Python tests with coverage
