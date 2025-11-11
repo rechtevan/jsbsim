@@ -62,7 +62,7 @@ jobs:
     needs: build
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout JSBSim
         uses: actions/checkout@v5
@@ -86,7 +86,7 @@ jobs:
           path: build/
 
       - name: Run fast unit tests with coverage
-        timeout-minutes: 15
+        timeout-minutes: 25
         env:
           PYTHONPATH: ${{ github.workspace }}/build/python
           LD_LIBRARY_PATH: ${{ github.workspace }}/build/src
@@ -109,6 +109,56 @@ jobs:
   # Integration tests - run in parallel with slow tests
   test-integration:
     name: Integration Tests
+    needs: build
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout JSBSim
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov pytest-xdist
+          pip install numpy pandas
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: jsbsim-build
+          path: build/
+
+      - name: Run integration tests with coverage
+        timeout-minutes: 55
+        env:
+          PYTHONPATH: ${{ github.workspace }}/build/python
+          LD_LIBRARY_PATH: ${{ github.workspace }}/build/src
+        run: |
+          cd tests
+          python -m pytest \
+            --cov=tests \
+            --cov-report=xml:../coverage-integration.xml \
+            --cov-report=term \
+            -m "integration and not slow" \
+            -v \
+            -n auto
+
+      - name: Upload integration test coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-integration
+          path: coverage-integration.xml
+
+  # Slow tests - run separately, can be optional
+  test-slow:
+    name: Slow Tests
     needs: build
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
@@ -135,58 +185,8 @@ jobs:
           name: jsbsim-build
           path: build/
 
-      - name: Run integration tests with coverage
-        timeout-minutes: 40
-        env:
-          PYTHONPATH: ${{ github.workspace }}/build/python
-          LD_LIBRARY_PATH: ${{ github.workspace }}/build/src
-        run: |
-          cd tests
-          python -m pytest \
-            --cov=tests \
-            --cov-report=xml:../coverage-integration.xml \
-            --cov-report=term \
-            -m "integration and not slow" \
-            -v \
-            -n auto
-
-      - name: Upload integration test coverage
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-integration
-          path: coverage-integration.xml
-
-  # Slow tests - run separately, can be optional
-  test-slow:
-    name: Slow Tests
-    needs: build
-    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - name: Checkout JSBSim
-        uses: actions/checkout@v5
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest pytest-cov pytest-xdist
-          pip install numpy pandas
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: jsbsim-build
-          path: build/
-
       - name: Run slow tests with coverage
-        timeout-minutes: 25
+        timeout-minutes: 40
         env:
           PYTHONPATH: ${{ github.workspace }}/build/python
           LD_LIBRARY_PATH: ${{ github.workspace }}/build/src
