@@ -15,6 +15,7 @@ jobs:
     name: Python Test Coverage
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 90
 
     steps:
       - name: Checkout JSBSim
