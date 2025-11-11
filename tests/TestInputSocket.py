@@ -22,6 +22,7 @@
 import asyncio
 import xml.etree.ElementTree as et
 
+import pytest
 import telnetlib3
 from JSBSim_utils import CopyAircraftDef, JSBSimTestCase, RunTest
 
@@ -90,6 +91,8 @@ class TestInputSocket(JSBSimTestCase):
                 self._fdm.check_incremental_hold()
             await asyncio.sleep(0.1)
 
+    @pytest.mark.slow
+    @pytest.mark.socket
     def test_no_input(self):
         self._fdm.load_script(self.script_path)
         self._fdm.run_ic()

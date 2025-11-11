@@ -405,6 +405,8 @@ class TestScriptExecution(JSBSimTestCase):
         # Verify engines were started
         self.assertTrue(engines_running, "737 engines were never started")
 
+    @pytest.mark.slow
+    @pytest.mark.script
     def test_short_s23_seaplane(self):
         """
         Test Short_S23_1.xml script - seaplane takeoff test.

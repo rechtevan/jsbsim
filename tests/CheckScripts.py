@@ -29,6 +29,7 @@ except ImportError:
 import xml.etree.ElementTree as et
 
 import pandas as pd
+import pytest
 
 
 class CheckScripts(JSBSimTestCase):
@@ -53,6 +54,8 @@ class CheckScripts(JSBSimTestCase):
         if fpectl is not None:
             fpectl.turnoff_sigfpe()
 
+    @pytest.mark.slow
+    @pytest.mark.script
     def testScriptEndTime(self):
         # Regression test: using a time step different than 120Hz in a script
         # could result in executing an extra time step in certain conditions
