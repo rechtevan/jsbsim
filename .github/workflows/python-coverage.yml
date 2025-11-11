@@ -48,6 +48,7 @@ jobs:
       - name: Run Python tests with coverage
         env:
           PYTHONPATH: ${{ github.workspace }}/build/python
+          LD_LIBRARY_PATH: ${{ github.workspace }}/build/src:${{ env.LD_LIBRARY_PATH }}
         run: |
           cd tests
           python -m pytest \
