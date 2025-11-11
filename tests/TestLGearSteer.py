@@ -39,7 +39,7 @@ class TestLGearSteer(JSBSimTestCase):
         self.assertAlmostEqual(fdm["fcs/steer-pos-deg"], 0.0)
 
         # Should be part of a unit test in C++ ?
-        if fpectl is None:
+        if fpectl is None or not hasattr(fpectl, "turnon_sigfpe"):
             self.skipTest("fpectl module not available (Python 3.12+)")
         fpectl.turnon_sigfpe()
 

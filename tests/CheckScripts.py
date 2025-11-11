@@ -33,7 +33,7 @@ import pandas as pd
 
 class CheckScripts(JSBSimTestCase):
     def testScripts(self):
-        if fpectl is None:
+        if fpectl is None or not hasattr(fpectl, "turnon_sigfpe"):
             self.skipTest("fpectl module not available (Python 3.12+)")
         fpectl.turnon_sigfpe()
 

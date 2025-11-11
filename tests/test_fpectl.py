@@ -36,7 +36,11 @@ from JSBSim_utils import RunTest  # noqa: E402
 
 class check_fpectl(unittest.TestCase):
     def testModule(self):
-        if fpectl is None:
+        if (
+            fpectl is None
+            or not hasattr(fpectl, "test_sigfpe")
+            or not hasattr(fpectl, "turnon_sigfpe")
+        ):
             self.skipTest("fpectl module not available (Python 3.12+)")
         # Check that FP exceptions are not caught by default
         fpectl.test_sigfpe()
