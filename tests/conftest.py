@@ -25,12 +25,12 @@ import sys
 
 import pytest
 
+import jsbsim
+
 # Make JSBSim module importable
 sys.path.insert(0, os.path.dirname(__file__))
 
-from JSBSim_utils import CreateFDM, SandBox
-
-import jsbsim
+from JSBSim_utils import CreateFDM, SandBox  # noqa: E402
 
 # Silence debug messages from JSBSim
 jsbsim.FGJSBBase().debug_lvl = 0
@@ -141,6 +141,7 @@ def pytest_collection_modifyitems(config, items):
     Automatically applies markers based on test file location:
     - Tests in integration_tests/ are marked with @pytest.mark.integration
     - Tests in unit_tests/ are marked with @pytest.mark.unit
+    - Root-level tests (not in subdirectories) are marked with @pytest.mark.unit
     """
     for item in items:
         # Mark integration tests
@@ -148,6 +149,9 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.integration)
         # Mark unit tests
         elif "unit_tests" in str(item.fspath):
+            item.add_marker(pytest.mark.unit)
+        # Fallback: mark root-level tests as unit tests
+        elif not any(marker.name in ["unit", "integration"] for marker in item.iter_markers()):
             item.add_marker(pytest.mark.unit)
 
 
