@@ -168,6 +168,18 @@ cmake -DSYSTEM_EXPAT=ON ..
 make
 ```
 
+### Security: Bundled Dependencies
+
+**Expat XML Parser - CVE-2024-8176**:
+- JSBSim bundles Expat 2.7.0, which includes the fix for CVE-2024-8176
+- **Vulnerability**: Stack overflow in processing deeply nested XML entities
+- **Status**: FIXED in Expat 2.7.0 (JSBSim is protected)
+- **Mitigation for production**: Use system-managed Expat for automatic security updates:
+  ```bash
+  cmake -DSYSTEM_EXPAT=ON ..
+  ```
+  This ensures Expat receives security patches through your OS package manager without requiring JSBSim rebuilds
+
 ### Python Module Build
 
 Requires Cython, Python 3 development headers, and (for tests) numpy, pandas, scipy.
