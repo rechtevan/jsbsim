@@ -40,6 +40,7 @@ set(PYTHON_TESTS
     TestPressureAltitude
     test_fpectl
     TestStdAtmosphere
+    TestAtmosphereBasic
     TestMiscellaneous
     TestGndReactions
     TestIntegrators
