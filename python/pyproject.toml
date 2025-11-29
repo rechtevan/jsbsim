@@ -4,7 +4,7 @@
 # Require setuptools >= 60.0.0 to be able to access its local copy of distutils
 # as distutils is deprecated for Python 3.10+ and will no longer be distributed
 # with Python 3.12+.
-requires = ["setuptools>=60.0.0,<72.0.0", "cython!=0.29.26"]
+requires = ["setuptools>=60.0.0,<81.0.0", "cython!=0.29.26"]
 build-backend = "setuptools.build_meta"
 
 [tool.cibuildwheel]
