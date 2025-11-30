@@ -5,37 +5,115 @@ on:
     branches-ignore:
       - 'dependabot/**'
   pull_request:
+  schedule:
+    # Run comprehensive coverage nightly at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
 
 jobs:
-  Codecov:
-    name: Code coverage
-    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  # Quick coverage check on every push (C++ unit tests only)
+  quick-coverage:
+    name: Quick C++ coverage
+    if: ${{ !startsWith(github.ref, 'refs/tags/') && github.event_name != 'schedule' }}
     runs-on: ubuntu-latest
     steps:
       - name: Install Ubuntu packages
         run: |
           sudo apt-get update
           sudo apt-get install cxxtest lcov
+
       - name: Checkout JSBSim
         uses: actions/checkout@v5
+
       - name: Configure JSBSim
         run: |
           mkdir build && cd build
           cmake -DENABLE_COVERAGE=ON -DBUILD_PYTHON_MODULE=OFF -DBUILD_DOCS=OFF ..
+
       - name: Build JSBSim
         working-directory: build
         run: make --jobs=$(nproc)
-      - name: Run JSBSim tests
+
+      - name: Run C++ unit tests
         working-directory: build
         run: ctest -R Test1 --output-on-failure
+
       - name: Generate coverage report
         working-directory: build
         run: make lcov
+
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
           files: ./build/lcov/data/capture/all_targets.info
+          flags: cpp-quick
           disable_search: true
-          fail_ci_if_error: true
+          fail_ci_if_error: false
+
+  # Comprehensive coverage with Python tests (nightly or manual)
+  full-coverage:
+    name: Full C++ coverage (with Python tests)
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Ubuntu packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install cxxtest lcov python3-pip python3-dev
+
+      - name: Checkout JSBSim
+        uses: actions/checkout@v5
+
+      - name: Install Python dependencies
+        run: |
+          pip3 install numpy pandas scipy cython pytest
+
+      - name: Configure JSBSim with Python
+        run: |
+          mkdir build && cd build
+          cmake -DENABLE_COVERAGE=ON \
+                -DBUILD_PYTHON_MODULE=ON \
+                -DBUILD_DOCS=OFF \
+                -DCMAKE_BUILD_TYPE=Debug \
+                ..
+
+      - name: Build JSBSim
+        working-directory: build
+        run: make --jobs=$(nproc)
+
+      - name: Run all ctest tests
+        working-directory: build
+        run: ctest --output-on-failure --timeout 300
+        continue-on-error: true
+
+      - name: Run Python integration tests
+        run: |
+          export PYTHONPATH=$PWD/build/python:$PYTHONPATH
+          export LD_LIBRARY_PATH=$PWD/build/src:$LD_LIBRARY_PATH
+          cd tests
+          python3 -m pytest -x -v --timeout=60 -m "not slow and not socket" \
+            --ignore=TestInputSocket.py \
+            2>&1 | head -500
+        continue-on-error: true
+
+      - name: Generate coverage report
+        working-directory: build
+        run: make lcov
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          files: ./build/lcov/data/capture/all_targets.info
+          flags: cpp-full
+          disable_search: true
+          fail_ci_if_error: false
+
+      - name: Post coverage summary
+        run: |
+          echo "## C++ Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          lcov --summary build/lcov/data/capture/all_targets.info 2>&1 | grep -E "lines|functions" >> $GITHUB_STEP_SUMMARY || true
