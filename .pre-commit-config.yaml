@@ -217,6 +217,20 @@ repos:
         verbose: true
 
   # =============================================================================
+  # C++ Static Analysis (Manual - Run with: pre-commit run cppcheck-manual --hook-stage manual)
+  # =============================================================================
+  - repo: local
+    hooks:
+      - id: cppcheck-manual
+        name: Run cppcheck on C++ code (manual)
+        entry: bash -c 'command -v cppcheck >/dev/null && cppcheck --enable=warning,style,performance --std=c++17 --suppress=missingIncludeSystem -I src src/ || echo "cppcheck not installed, skipping"'
+        language: system
+        pass_filenames: false
+        stages: [manual]
+        always_run: true
+        verbose: true
+
+  # =============================================================================
   # Security Checks
   # =============================================================================
   - repo: https://github.com/Yelp/detect-secrets

@@ -1,0 +1,140 @@
+# C++ Static Analysis Workflow
+#
+# Runs cppcheck and clang-tidy on C++ source files to catch bugs,
+# enforce coding standards, and suggest improvements.
+#
+# Cppcheck runs on every push/PR (fast).
+# Clang-tidy runs nightly (slower but more thorough).
+
+name: C++ Static Analysis
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'src/**/*.cpp'
+      - 'src/**/*.h'
+      - '.clang-tidy'
+      - '.github/workflows/cpp-analysis.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'src/**/*.cpp'
+      - 'src/**/*.h'
+      - '.clang-tidy'
+  schedule:
+    # Run clang-tidy nightly at 5 AM UTC
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+
+jobs:
+  cppcheck:
+    name: Cppcheck Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+
+      - name: Get cppcheck version
+        run: cppcheck --version
+
+      - name: Run cppcheck
+        run: |
+          cppcheck \
+            --enable=warning,style,performance,portability \
+            --std=c++17 \
+            --suppress=missingIncludeSystem \
+            --suppress=unusedFunction \
+            --suppress=unmatchedSuppression \
+            --inline-suppr \
+            --error-exitcode=0 \
+            --xml --xml-version=2 \
+            -I src \
+            -I src/math \
+            -I src/models \
+            -I src/input_output \
+            -I src/initialization \
+            src/ 2>&1 | tee cppcheck-report.xml
+
+      - name: Count warnings
+        run: |
+          WARNING_COUNT=$(grep -c "<error " cppcheck-report.xml || echo "0")
+          echo "Cppcheck found $WARNING_COUNT issues"
+          echo "CPPCHECK_WARNINGS=$WARNING_COUNT" >> $GITHUB_ENV
+
+      - name: Upload cppcheck report
+        uses: actions/upload-artifact@v4
+        with:
+          name: cppcheck-report
+          path: cppcheck-report.xml
+          retention-days: 30
+
+      - name: Post summary
+        run: |
+          echo "## Cppcheck Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Found **${{ env.CPPCHECK_WARNINGS }}** issues" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "See artifact 'cppcheck-report' for details" >> $GITHUB_STEP_SUMMARY
+
+  clang-tidy:
+    name: Clang-Tidy Analysis
+    runs-on: ubuntu-latest
+    # Only run on schedule or manual dispatch (too slow for every PR)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy cmake build-essential
+
+      - name: Get clang-tidy version
+        run: clang-tidy --version
+
+      - name: Generate compile_commands.json
+        run: |
+          mkdir -p build
+          cd build
+          cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+                -DCMAKE_CXX_COMPILER=clang++ \
+                -DBUILD_PYTHON_MODULE=OFF \
+                ..
+
+      - name: Run clang-tidy on core files
+        run: |
+          # Run on a subset of important files to keep runtime reasonable
+          find src/models src/math src/initialization \
+            -name "*.cpp" -type f | head -50 | \
+          xargs -I {} clang-tidy {} \
+            -p build \
+            --config-file=.clang-tidy \
+            2>&1 | tee clang-tidy-report.txt || true
+
+      - name: Count warnings
+        run: |
+          WARNING_COUNT=$(grep -c "warning:" clang-tidy-report.txt || echo "0")
+          echo "Clang-tidy found $WARNING_COUNT warnings"
+          echo "CLANG_TIDY_WARNINGS=$WARNING_COUNT" >> $GITHUB_ENV
+
+      - name: Upload clang-tidy report
+        uses: actions/upload-artifact@v4
+        with:
+          name: clang-tidy-report
+          path: clang-tidy-report.txt
+          retention-days: 30
+
+      - name: Post summary
+        run: |
+          echo "## Clang-Tidy Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Found **${{ env.CLANG_TIDY_WARNINGS }}** warnings" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "See artifact 'clang-tidy-report' for details" >> $GITHUB_STEP_SUMMARY
