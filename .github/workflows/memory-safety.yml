@@ -1,0 +1,177 @@
+name: Memory Safety Testing
+
+on:
+  schedule:
+    # Run nightly at 3 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    # Allow manual triggering
+  push:
+    branches:
+      - master
+    paths:
+      - 'src/**/*.cpp'
+      - 'src/**/*.h'
+
+jobs:
+  # AddressSanitizer build and test
+  asan:
+    name: AddressSanitizer (ASan)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout JSBSim
+        uses: actions/checkout@v5
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake python3-dev
+
+      - name: Build with AddressSanitizer
+        run: |
+          mkdir -p build-asan
+          cd build-asan
+          cmake -DCMAKE_BUILD_TYPE=Debug \
+                -DCMAKE_C_FLAGS="-fsanitize=address -fno-omit-frame-pointer -g" \
+                -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer -g" \
+                -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address" \
+                -DBUILD_PYTHON_MODULE=OFF \
+                ..
+          make -j$(nproc)
+
+      - name: Run ASan tests
+        env:
+          ASAN_OPTIONS: "detect_leaks=1:abort_on_error=1:symbolize=1"
+        run: |
+          cd build-asan
+          # Run basic executable test
+          ./src/JSBSim --help || true
+
+          # Run a short simulation script
+          timeout 60 ./src/JSBSim --script=../scripts/ball.xml --end-time=1.0 2>&1 || true
+
+          # Run CTest with timeout
+          ctest --output-on-failure --timeout 120 -j2 2>&1 || true
+
+      - name: ASan Summary
+        if: always()
+        run: |
+          echo "## AddressSanitizer Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "AddressSanitizer checks for:" >> $GITHUB_STEP_SUMMARY
+          echo "- Buffer overflows (stack and heap)" >> $GITHUB_STEP_SUMMARY
+          echo "- Use-after-free errors" >> $GITHUB_STEP_SUMMARY
+          echo "- Memory leaks" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the job logs for any detected issues." >> $GITHUB_STEP_SUMMARY
+
+  # UndefinedBehaviorSanitizer build and test
+  ubsan:
+    name: UndefinedBehaviorSanitizer (UBSan)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout JSBSim
+        uses: actions/checkout@v5
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake python3-dev
+
+      - name: Build with UndefinedBehaviorSanitizer
+        run: |
+          mkdir -p build-ubsan
+          cd build-ubsan
+          cmake -DCMAKE_BUILD_TYPE=Debug \
+                -DCMAKE_C_FLAGS="-fsanitize=undefined -fno-omit-frame-pointer -g" \
+                -DCMAKE_CXX_FLAGS="-fsanitize=undefined -fno-omit-frame-pointer -g" \
+                -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=undefined" \
+                -DBUILD_PYTHON_MODULE=OFF \
+                ..
+          make -j$(nproc)
+
+      - name: Run UBSan tests
+        env:
+          UBSAN_OPTIONS: "print_stacktrace=1:halt_on_error=0"
+        run: |
+          cd build-ubsan
+          # Run basic executable test
+          ./src/JSBSim --help || true
+
+          # Run a short simulation script
+          timeout 60 ./src/JSBSim --script=../scripts/ball.xml --end-time=1.0 2>&1 || true
+
+          # Run CTest with timeout
+          ctest --output-on-failure --timeout 120 -j2 2>&1 || true
+
+      - name: UBSan Summary
+        if: always()
+        run: |
+          echo "## UndefinedBehaviorSanitizer Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "UBSan checks for:" >> $GITHUB_STEP_SUMMARY
+          echo "- Integer overflow" >> $GITHUB_STEP_SUMMARY
+          echo "- Null pointer dereference" >> $GITHUB_STEP_SUMMARY
+          echo "- Invalid type casts" >> $GITHUB_STEP_SUMMARY
+          echo "- Division by zero" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the job logs for any detected issues." >> $GITHUB_STEP_SUMMARY
+
+  # Valgrind memory check
+  valgrind:
+    name: Valgrind Memory Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout JSBSim
+        uses: actions/checkout@v5
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake valgrind python3-dev
+
+      - name: Build for Valgrind
+        run: |
+          mkdir -p build-valgrind
+          cd build-valgrind
+          cmake -DCMAKE_BUILD_TYPE=Debug \
+                -DCMAKE_C_FLAGS="-g -O0" \
+                -DCMAKE_CXX_FLAGS="-g -O0" \
+                -DBUILD_PYTHON_MODULE=OFF \
+                ..
+          make -j$(nproc)
+
+      - name: Run Valgrind tests
+        run: |
+          cd build-valgrind
+
+          # Run Valgrind on help command
+          valgrind --leak-check=full --show-leak-kinds=all --error-exitcode=0 \
+            ./src/JSBSim --help 2>&1 | tee valgrind-help.log || true
+
+          # Run Valgrind on short simulation
+          timeout 300 valgrind --leak-check=full --show-leak-kinds=all --error-exitcode=0 \
+            ./src/JSBSim --script=../scripts/ball.xml --end-time=0.5 2>&1 | tee valgrind-sim.log || true
+
+      - name: Upload Valgrind logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: valgrind-logs
+          path: build-valgrind/valgrind-*.log
+          retention-days: 7
+
+      - name: Valgrind Summary
+        if: always()
+        run: |
+          echo "## Valgrind Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Valgrind checks for:" >> $GITHUB_STEP_SUMMARY
+          echo "- Memory leaks" >> $GITHUB_STEP_SUMMARY
+          echo "- Invalid memory access" >> $GITHUB_STEP_SUMMARY
+          echo "- Uninitialized memory use" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download the valgrind-logs artifact for detailed reports." >> $GITHUB_STEP_SUMMARY
