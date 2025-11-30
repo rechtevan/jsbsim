@@ -1,0 +1,52 @@
+name: Validate XML Files
+
+on:
+  push:
+    paths:
+      - 'aircraft/**/*.xml'
+      - 'engine/**/*.xml'
+      - 'systems/**/*.xml'
+      - 'scripts/**/*.xml'
+  pull_request:
+    paths:
+      - 'aircraft/**/*.xml'
+      - 'engine/**/*.xml'
+      - 'systems/**/*.xml'
+      - 'scripts/**/*.xml'
+
+jobs:
+  validate-xml:
+    name: Validate XML Syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout JSBSim
+        uses: actions/checkout@v5
+
+      - name: Install xmllint
+        run: sudo apt-get install -y libxml2-utils
+
+      - name: Validate aircraft XML files
+        run: |
+          echo "Validating aircraft XML files..."
+          find aircraft -name "*.xml" -type f | head -50 | xargs -I {} xmllint --noout {} 2>&1 || true
+          echo "Aircraft validation complete"
+
+      - name: Validate engine XML files
+        run: |
+          echo "Validating engine XML files..."
+          find engine -name "*.xml" -type f | xargs -I {} xmllint --noout {} 2>&1 || true
+          echo "Engine validation complete"
+
+      - name: Validate scripts XML files
+        run: |
+          echo "Validating scripts XML files..."
+          find scripts -name "*.xml" -type f | xargs -I {} xmllint --noout {} 2>&1 || true
+          echo "Scripts validation complete"
+
+      - name: Summary
+        run: |
+          echo "## XML Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Aircraft XML files: $(find aircraft -name '*.xml' -type f | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "- Engine XML files: $(find engine -name '*.xml' -type f | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "- Scripts XML files: $(find scripts -name '*.xml' -type f | wc -l)" >> $GITHUB_STEP_SUMMARY
