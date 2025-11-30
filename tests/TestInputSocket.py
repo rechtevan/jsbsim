@@ -55,7 +55,11 @@ class TelnetInterface:
         return float(msg[0].split("=")[1])
 
 
+@pytest.mark.slow
+@pytest.mark.socket
 class TestInputSocket(JSBSimTestCase):
+    """Socket tests are slow and require network - skip with -m 'not slow'"""
+
     def setUp(self, *args):
         super().setUp(*args)
         self._fdm = self.create_fdm()
