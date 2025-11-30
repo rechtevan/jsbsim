@@ -80,7 +80,7 @@ jobs:
           pip install numpy pandas scipy telnetlib3
 
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: jsbsim-build
           path: build/
@@ -124,7 +124,7 @@ jobs:
           python-version: '3.12'
 
       - name: Download coverage report
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: python-coverage-report
           path: .
