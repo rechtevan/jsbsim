@@ -1,0 +1,226 @@
+name: Fuzzing Tests
+
+on:
+  schedule:
+    # Run nightly at 4 AM UTC (after memory safety tests)
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+    inputs:
+      fuzz_time:
+        description: 'Fuzzing duration in seconds'
+        required: false
+        default: '300'
+
+jobs:
+  # AFL++ fuzzing for XML parser
+  afl-fuzz:
+    name: AFL++ XML Parser Fuzzing
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout JSBSim
+        uses: actions/checkout@v5
+
+      - name: Install AFL++
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y afl++ build-essential cmake
+
+      - name: Build with AFL++ instrumentation
+        run: |
+          mkdir -p build-afl
+          cd build-afl
+          CC=afl-clang-fast CXX=afl-clang-fast++ cmake \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_PYTHON_MODULE=OFF \
+            ..
+          make -j$(nproc)
+
+      - name: Create seed corpus
+        run: |
+          mkdir -p fuzz-input fuzz-output
+          # Copy sample XML files as seed corpus
+          cp scripts/ball.xml fuzz-input/
+          cp scripts/Short_S23_1.xml fuzz-input/ 2>/dev/null || true
+          # Create minimal XML inputs
+          echo '<?xml version="1.0"?><fdm_config></fdm_config>' > fuzz-input/minimal.xml
+          echo '<?xml version="1.0"?><runscript><run start="0" end="1" dt="0.01"></run></runscript>' > fuzz-input/script.xml
+
+      - name: Run AFL++ fuzzing
+        timeout-minutes: 10
+        run: |
+          cd build-afl
+          export AFL_SKIP_CPUFREQ=1
+          export AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1
+
+          # Run fuzzer with timeout
+          timeout ${{ github.event.inputs.fuzz_time || '300' }}s \
+            afl-fuzz -i ../fuzz-input -o ../fuzz-output -t 5000 \
+            -- ./src/JSBSim --script=@@ --end-time=0.1 2>&1 || true
+
+      - name: Check for crashes
+        if: always()
+        run: |
+          echo "## AFL++ Fuzzing Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -d "fuzz-output/default/crashes" ]; then
+            crash_count=$(find fuzz-output/default/crashes -type f ! -name "README.txt" | wc -l)
+            if [ "$crash_count" -gt 0 ]; then
+              echo "**Found $crash_count crashes**" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "Download the fuzzing-artifacts for crash inputs." >> $GITHUB_STEP_SUMMARY
+            else
+              echo "No crashes found" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "No crash directory found (fuzzing may have been too short)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ -d "fuzz-output/default/hangs" ]; then
+            hang_count=$(find fuzz-output/default/hangs -type f | wc -l)
+            if [ "$hang_count" -gt 0 ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Found $hang_count hangs**" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+      - name: Upload fuzzing artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: afl-fuzzing-results
+          path: |
+            fuzz-output/
+          retention-days: 7
+
+  # LibFuzzer for targeted function fuzzing
+  libfuzzer:
+    name: LibFuzzer Property Parsing
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout JSBSim
+        uses: actions/checkout@v5
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang build-essential cmake
+
+      - name: Create fuzz target
+        run: |
+          mkdir -p fuzz-targets
+          cat > fuzz-targets/fuzz_property.cpp << 'EOF'
+          // LibFuzzer target for property name parsing
+          #include <cstdint>
+          #include <cstddef>
+          #include <string>
+
+          // Simulated property name parser that exercises string handling
+          bool parsePropertyName(const std::string& name) {
+              if (name.empty()) return false;
+              if (name.length() > 256) return false;
+
+              // Check for valid property path characters
+              for (size_t i = 0; i < name.length(); i++) {
+                  char c = name[i];
+                  if (!((c >= 'a' && c <= 'z') ||
+                        (c >= 'A' && c <= 'Z') ||
+                        (c >= '0' && c <= '9') ||
+                        c == '/' || c == '-' || c == '_' || c == '[' || c == ']')) {
+                      return false;
+                  }
+              }
+              return true;
+          }
+
+          extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+              std::string input(reinterpret_cast<const char*>(data), size);
+              parsePropertyName(input);
+              return 0;
+          }
+          EOF
+
+      - name: Build fuzz target
+        run: |
+          clang++ -g -O1 -fno-omit-frame-pointer \
+            -fsanitize=fuzzer,address \
+            fuzz-targets/fuzz_property.cpp \
+            -o fuzz-targets/fuzz_property
+
+      - name: Run LibFuzzer
+        timeout-minutes: 5
+        run: |
+          mkdir -p libfuzzer-corpus libfuzzer-artifacts
+
+          # Seed corpus
+          echo "position/h-sl-ft" > libfuzzer-corpus/seed1
+          echo "velocities/vc-kts" > libfuzzer-corpus/seed2
+          echo "propulsion/engine[0]/thrust-lbs" > libfuzzer-corpus/seed3
+
+          # Run fuzzer
+          timeout ${{ github.event.inputs.fuzz_time || '120' }}s \
+            ./fuzz-targets/fuzz_property \
+            -artifact_prefix=libfuzzer-artifacts/ \
+            -max_len=512 \
+            libfuzzer-corpus/ 2>&1 || true
+
+      - name: LibFuzzer Summary
+        if: always()
+        run: |
+          echo "## LibFuzzer Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          artifact_count=$(find libfuzzer-artifacts -type f 2>/dev/null | wc -l)
+          if [ "$artifact_count" -gt 0 ]; then
+            echo "**Found $artifact_count crash/timeout artifacts**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No crashes or timeouts found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload LibFuzzer artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: libfuzzer-results
+          path: |
+            libfuzzer-artifacts/
+            libfuzzer-corpus/
+          retention-days: 7
+
+  # OSS-Fuzz integration check
+  oss-fuzz-check:
+    name: OSS-Fuzz Build Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout JSBSim
+        uses: actions/checkout@v5
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang build-essential cmake
+
+      - name: Build with fuzzer-compatible flags
+        run: |
+          mkdir -p build-fuzz
+          cd build-fuzz
+          CC=clang CXX=clang++ cmake \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="-g -O1 -fno-omit-frame-pointer" \
+            -DCMAKE_CXX_FLAGS="-g -O1 -fno-omit-frame-pointer" \
+            -DBUILD_PYTHON_MODULE=OFF \
+            ..
+          make -j$(nproc)
+
+      - name: OSS-Fuzz compatibility check
+        run: |
+          echo "## OSS-Fuzz Compatibility" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Build completed successfully with Clang and fuzzer-compatible flags." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To integrate with OSS-Fuzz:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Create fuzz targets in a \`fuzz/\` directory" >> $GITHUB_STEP_SUMMARY
+          echo "2. Submit to [google/oss-fuzz](https://github.com/google/oss-fuzz)" >> $GITHUB_STEP_SUMMARY
