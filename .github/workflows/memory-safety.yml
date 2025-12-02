@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout JSBSim
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Install dependencies
         run: |
@@ -73,7 +73,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout JSBSim
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Install dependencies
         run: |
@@ -126,7 +126,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Checkout JSBSim
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Install dependencies
         run: |
