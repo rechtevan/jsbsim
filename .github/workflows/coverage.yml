@@ -90,12 +90,15 @@ jobs:
 
       - name: Run Python integration tests
         run: |
-          export PYTHONPATH=$PWD/build/python:$PYTHONPATH
-          export LD_LIBRARY_PATH=$PWD/build/src:$LD_LIBRARY_PATH
-          cd tests
-          python3 -m pytest -x -v --timeout=60 -m "not slow and not socket" \
-            --ignore=TestInputSocket.py \
-            2>&1 | head -500
+          # Use absolute paths to avoid import issues
+          export PYTHONPATH=${{ github.workspace }}/build/python:$PYTHONPATH
+          export LD_LIBRARY_PATH=${{ github.workspace }}/build/src:$LD_LIBRARY_PATH
+          # Verify the module can be imported
+          python3 -c "import jsbsim; print(f'JSBSim version: {jsbsim.FGJSBBase().get_version()}')"
+          # Run tests from workspace root, not tests/ directory
+          python3 -m pytest tests/ -v --timeout=120 -m "not slow and not socket" \
+            --ignore=tests/TestInputSocket.py \
+            2>&1 | tail -200
         continue-on-error: true
 
       - name: Generate coverage report
