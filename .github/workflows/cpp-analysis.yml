@@ -68,7 +68,7 @@ jobs:
           echo "CPPCHECK_WARNINGS=$WARNING_COUNT" >> $GITHUB_ENV
 
       - name: Upload cppcheck report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: cppcheck-report
           path: cppcheck-report.xml
@@ -125,7 +125,7 @@ jobs:
           echo "CLANG_TIDY_WARNINGS=$WARNING_COUNT" >> $GITHUB_ENV
 
       - name: Upload clang-tidy report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: clang-tidy-report
           path: clang-tidy-report.txt
