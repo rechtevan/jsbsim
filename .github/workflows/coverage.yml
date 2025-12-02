@@ -97,10 +97,12 @@ jobs:
           export LD_LIBRARY_PATH=${{ github.workspace }}/build/src:$LD_LIBRARY_PATH
           # Verify the module can be imported
           python3 -c "import jsbsim; print(f'JSBSim version: {jsbsim.FGJSBBase().get_version()}')" || echo "Import failed - continuing anyway"
+          # Install pytest-timeout for test timeouts
+          pip3 install pytest-timeout
           # Run tests from workspace root
           python3 -m pytest tests/ -v --timeout=120 -m "not slow and not socket" \
             --ignore=tests/TestInputSocket.py \
-            2>&1 | tail -200 || echo "Some tests may have failed"
+            2>&1 | tail -300 || echo "Some tests may have failed"
         continue-on-error: true
 
       - name: Generate coverage report
